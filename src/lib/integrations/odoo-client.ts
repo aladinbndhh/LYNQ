@@ -60,9 +60,12 @@ export class OdooClient {
         const setCookieHeader = response.headers.get('set-cookie');
         if (setCookieHeader) {
           this.cookies = setCookieHeader;
-          }
+        }
         
-        return this.uid;
+        // Ensure uid is set and is a number
+        if (this.uid && typeof this.uid === 'number') {
+          return this.uid;
+        }
       }
 
       throw new Error('Authentication failed: Invalid response');
