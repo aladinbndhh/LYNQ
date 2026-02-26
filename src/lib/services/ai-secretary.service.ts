@@ -528,7 +528,7 @@ Available functions:
       conversation.status = 'booked';
       await (conversation as any).save();
 
-      const meetingId = meeting._id?.toString() || meeting.id?.toString() || '';
+      const meetingId = meeting._id?.toString() || '';
       
       return {
         success: true,
