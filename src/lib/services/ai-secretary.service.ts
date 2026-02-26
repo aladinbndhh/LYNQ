@@ -402,8 +402,13 @@ Available functions:
       const tenantContext = createTenantContext(systemUser);
 
       // Call CalendarService to get real availability
+      const profileId = profile.id?.toString() || profile._id?.toString();
+      if (!profileId) {
+        throw new Error('Profile ID is required');
+      }
+      
       const slots = await CalendarService.getAvailability({
-        profileId: profile._id.toString(),
+        profileId,
         date: args.date,
         duration,
         timezone: args.timezone,
@@ -455,12 +460,42 @@ Available functions:
       const tenantContext = createTenantContext(systemUser);
 
       // Create lead if we have visitor info
+      const profileId = profile.id?.toString() || profile._id?.toString();
+      const conversationId = conversation._id?.toString();
+      
+      if (!profileId) {
+        throw new Error('Profile ID is required');
+      }
+      
       let leadId: string | undefined;
       if (conversation.leadInfo?.email) {
+        // Convert profileId to ObjectId if it's a string
+        const { Types } = await import('mongoose');
+        let profileIdObj: Types.ObjectId | null = null;
+        
+        if (profile._id instanceof Types.ObjectId) {
+          profileIdObj = profile._id;
+        } else if (profile._id) {
+          profileIdObj = new Types.ObjectId(String(profile._id));
+        } else if (profile.id) {
+          profileIdObj = new Types.ObjectId(String(profile.id));
+        }
+        
+        let conversationIdObj: Types.ObjectId | undefined = undefined;
+        if (conversation._id instanceof Types.ObjectId) {
+          conversationIdObj = conversation._id;
+        } else if (conversation._id) {
+          conversationIdObj = new Types.ObjectId(String(conversation._id));
+        }
+        
+        if (!profileIdObj) {
+          throw new Error('Invalid profile ID');
+        }
+        
         const lead = await LeadService.createLead(
           {
-            profileId: profile._id,
-            conversationId: conversation._id,
+            profileId: profileIdObj,
+            conversationId: conversationIdObj,
             name: conversation.leadInfo.name || args.attendee.name,
             email: conversation.leadInfo.email || args.attendee.email,
             company: conversation.leadInfo.company,
@@ -470,15 +505,15 @@ Available functions:
           },
           tenantContext
         );
-        leadId = lead._id.toString();
+        leadId = lead._id?.toString() || '';
       }
 
       // Book meeting using CalendarService
       const meeting = await CalendarService.bookMeeting(
         {
-          profileId: profile._id.toString(),
+          profileId,
           leadId,
-          conversationId: conversation._id.toString(),
+          conversationId: conversationId || '',
           title: `Meeting with ${args.attendee.name}`,
           description: args.notes || `Meeting scheduled via AI chat`,
           startTime: args.startTime,
@@ -493,10 +528,12 @@ Available functions:
       conversation.status = 'booked';
       await (conversation as any).save();
 
+      const meetingId = meeting._id?.toString() || meeting.id?.toString() || '';
+      
       return {
         success: true,
         message: 'Meeting booked successfully',
-        meetingId: meeting._id.toString(),
+        meetingId,
         startTime: args.startTime,
         endTime: args.endTime,
       };
@@ -525,11 +562,14 @@ Available functions:
       if (profile && (profile as any).userId?.email) {
         // In production, this would send an email notification
         // For now, we log it - email service can be added later
-        console.log(`Escalation notification for profile ${profile._id}:`, {
+        const profileIdStr = profile.id?.toString() || profile._id?.toString() || 'unknown';
+        const conversationIdStr = conversation._id?.toString() || 'unknown';
+        
+        console.log(`Escalation notification for profile ${profileIdStr}:`, {
           reason: args.reason,
           visitorEmail: conversation.leadInfo?.email,
-          conversationId: conversation._id,
-          profileOwnerEmail: (profile as any).userId.email,
+          conversationId: conversationIdStr,
+          profileOwnerEmail: (profile as any).userId?.email,
         });
         
         // TODO: Integrate with email service (nodemailer) to send actual notification

@@ -55,7 +55,11 @@ export class OdooClient {
       }
 
       if (data.success && data.uid && typeof data.uid === 'number') {
-        this.uid = data.uid;
+        const uid = Number(data.uid);
+        if (isNaN(uid)) {
+          throw new Error('Authentication failed: Invalid user ID');
+        }
+        this.uid = uid;
         this.sessionId = data.session_id || null;
         
         // Store cookies for subsequent requests
@@ -64,7 +68,7 @@ export class OdooClient {
           this.cookies = setCookieHeader;
         }
         
-        return this.uid;
+        return uid;
       }
 
       throw new Error('Authentication failed: Invalid response');
