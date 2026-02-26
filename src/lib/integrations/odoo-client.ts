@@ -25,7 +25,9 @@ export class OdooClient {
    * Authenticate using custom HTTP endpoint (pure HTTP JSON, no RPC)
    */
   async authenticate(): Promise<number> {
-    if (this.uid) return this.uid;
+    if (this.uid !== null && typeof this.uid === 'number') {
+      return this.uid;
+    }
 
     try {
       // Use custom HTTP JSON endpoint (no RPC protocol)
@@ -52,7 +54,7 @@ export class OdooClient {
         throw new Error(data.error || 'Authentication failed');
       }
 
-      if (data.success && data.uid) {
+      if (data.success && data.uid && typeof data.uid === 'number') {
         this.uid = data.uid;
         this.sessionId = data.session_id || null;
         
@@ -62,10 +64,7 @@ export class OdooClient {
           this.cookies = setCookieHeader;
         }
         
-        // Ensure uid is set and is a number
-        if (this.uid && typeof this.uid === 'number') {
-          return this.uid;
-        }
+        return this.uid;
       }
 
       throw new Error('Authentication failed: Invalid response');
