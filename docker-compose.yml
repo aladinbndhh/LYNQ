@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:8.0
+    container_name: lynq-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - lynq-network
+    command: mongod --noauth
+
+  redis:
+    image: redis:7-alpine
+    container_name: lynq-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass lynq_redis_password
+    volumes:
+      - redis_data:/data
+    networks:
+      - lynq-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lynq-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      MONGODB_URI: mongodb://lynq:lynq_dev_password@mongodb:27017/lynq?authSource=admin
+      REDIS_URL: redis://:lynq_redis_password@redis:6379
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-your-secret-key-change-in-production}
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - lynq-network
+
+volumes:
+  mongodb_data:
+  mongodb_config:
+  redis_data:
+
+networks:
+  lynq-network:
+    driver: bridge
