@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { Types } from 'mongoose';
 import connectDB from '@/lib/db/connection';
 import { AnalyticsService } from '@/lib/services/analytics.service';
 import { Profile } from '@/lib/db/models';
@@ -30,14 +31,29 @@ export async function POST(request: NextRequest) {
       return errorResponse('Profile not found', 404);
     }
 
+    // Convert tenantId and profileId to ObjectId
+    const tenantId = profile.tenantId instanceof Types.ObjectId 
+      ? profile.tenantId 
+      : typeof profile.tenantId === 'string' 
+        ? new Types.ObjectId(profile.tenantId)
+        : null;
+    
+    const profileId = profile._id instanceof Types.ObjectId
+      ? profile._id
+      : null;
+
+    if (!tenantId || !profileId) {
+      return errorResponse('Invalid profile data', 400);
+    }
+
     // Track event
     const ipAddress = getClientIp(request);
     const userAgent = request.headers.get('user-agent') || undefined;
     const referrer = request.headers.get('referer') || undefined;
 
     await AnalyticsService.trackEvent({
-      tenantId: profile.tenantId,
-      profileId: profile._id,
+      tenantId,
+      profileId,
       eventType: body.eventType,
       metadata: body.metadata,
       ipAddress,
