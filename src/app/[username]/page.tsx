@@ -207,7 +207,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
       {/* AI Chat Widget */}
       {profile.aiConfig?.enabled && (
         <ModernChatWidget
-          profileId={profile._id.toString()}
+          profileId={(profile.id?.toString() || profile._id?.toString() || '')}
           greeting={profile.aiConfig.greeting}
           primaryColor={profile.branding?.primaryColor}
           assistantName="AI Secretary"
