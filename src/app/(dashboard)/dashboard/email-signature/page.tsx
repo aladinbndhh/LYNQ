@@ -102,18 +102,23 @@ export default function EmailSignaturePage() {
               Select Profile:
             </label>
             <select
-              value={selectedProfile._id.toString()}
+              value={selectedProfile?.id?.toString() || selectedProfile?._id?.toString() || ''}
               onChange={(e) => {
-                const profile = profiles.find((p) => p._id.toString() === e.target.value);
+                const profile = profiles.find((p) => 
+                  p.id?.toString() === e.target.value || p._id?.toString() === e.target.value
+                );
                 setSelectedProfile(profile || null);
               }}
               className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {profiles.map((profile) => (
-                <option key={profile._id.toString()} value={profile._id.toString()}>
-                  {profile.displayName} (@{profile.username})
-                </option>
-              ))}
+              {profiles.map((profile) => {
+                const profileId = profile.id?.toString() || profile._id?.toString() || '';
+                return (
+                  <option key={profileId} value={profileId}>
+                    {profile.displayName} (@{profile.username})
+                  </option>
+                );
+              })}
             </select>
           </div>
         )}
