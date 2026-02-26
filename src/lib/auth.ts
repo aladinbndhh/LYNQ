@@ -62,9 +62,9 @@ export const authOptions: NextAuthOptions = {
             }
           }
           
-          if (!uid || uid === false) {
-          throw new Error('Invalid email or password');
-        }
+          if (!uid || uid <= 0) {
+            throw new Error('Invalid email or password');
+          }
 
           // Get user info from Odoo
           const users = await client.searchRead(
