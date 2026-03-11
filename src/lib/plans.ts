@@ -1,13 +1,13 @@
 /**
- * Plan definitions — safe to import from both server and client components.
- * priceId values are undefined in the browser but only used server-side.
+ * Plan metadata — safe to import on client and server.
+ * Prices are NOT hardcoded here; they are fetched live from Stripe
+ * via GET /api/billing/plans so they always match the Stripe dashboard.
  */
 
 export const PLANS = {
   solo: {
     name: 'Solo',
     description: 'Perfect for individuals and freelancers',
-    price: 19,           // fixed monthly price in QAR
     priceId: process.env.STRIPE_SOLO_PRICE_ID as string | undefined,
     perUser: false,
     maxUsers: 1,
@@ -27,12 +27,11 @@ export const PLANS = {
   business: {
     name: 'Business',
     description: 'For teams — billed per active user',
-    price: 12,           // price PER USER per month in QAR
     priceId: process.env.STRIPE_BUSINESS_PRICE_ID as string | undefined,
     perUser: true,
-    maxUsers: -1,        // unlimited
-    aiChats: -1,         // unlimited
-    profiles: -1,        // unlimited
+    maxUsers: -1,
+    aiChats: -1,
+    profiles: -1,
     features: [
       'Unlimited users (pay per seat)',
       'Unlimited digital cards',
