@@ -4,9 +4,31 @@ import connectDB from '@/lib/db/connection';
 import { Tenant } from '@/lib/db/models';
 import { stripe } from '@/lib/stripe';
 
-const PLAN_LIMITS: Record<string, { subscriptionTier: 'free' | 'pro' | 'enterprise'; aiUsageLimit: number }> = {
-  pro: { subscriptionTier: 'pro', aiUsageLimit: 500 },
-  enterprise: { subscriptionTier: 'enterprise', aiUsageLimit: 99999 },
+/** Derive the update payload for a tenant from plan + userCount */
+function buildPlanUpdate(plan: string, userCount: number) {
+  switch (plan) {
+    case 'solo':
+      return {
+        subscriptionTier: 'solo' as const,
+        userCount: 1,
+        aiUsageLimit: 500,
+      };
+    case 'business':
+      return {
+        subscriptionTier: 'business' as const,
+        userCount: Math.max(userCount, 2),
+        aiUsageLimit: -1, // unlimited
+      };
+    default:
+      return null;
+  }
+}
+
+/** Downgrade a tenant back to free when subscription ends/fails */
+const FREE_DOWNGRADE = {
+  subscriptionTier: 'free' as const,
+  userCount: 1,
+  aiUsageLimit: 50,
 };
 
 export async function POST(request: NextRequest) {
@@ -29,47 +51,84 @@ export async function POST(request: NextRequest) {
 
   try {
     switch (event.type) {
+
+      // ── Payment succeeded → activate plan ──────────────────────────────────
       case 'checkout.session.completed': {
-        const checkoutSession = event.data.object as Stripe.Checkout.Session;
-        const tenantId = checkoutSession.metadata?.tenantId;
-        const plan = checkoutSession.metadata?.plan as string;
+        const cs = event.data.object as Stripe.Checkout.Session;
+        const tenantId = cs.metadata?.tenantId;
+        const plan = cs.metadata?.plan;
+        const userCount = parseInt(cs.metadata?.userCount ?? '1', 10);
 
-        if (tenantId && plan && PLAN_LIMITS[plan]) {
-          await Tenant.findByIdAndUpdate(tenantId, {
-            ...PLAN_LIMITS[plan],
-            stripeCustomerId: checkoutSession.customer as string,
-          });
-        }
-        break;
-      }
-
-      case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
-        const tenantId = subscription.metadata?.tenantId;
-        const plan = subscription.metadata?.plan as string;
-
-        if (tenantId) {
-          if (subscription.status === 'active' && plan && PLAN_LIMITS[plan]) {
-            await Tenant.findByIdAndUpdate(tenantId, PLAN_LIMITS[plan]);
-          } else if (subscription.status === 'past_due' || subscription.status === 'unpaid') {
+        if (tenantId && plan) {
+          const update = buildPlanUpdate(plan, userCount);
+          if (update) {
             await Tenant.findByIdAndUpdate(tenantId, {
-              subscriptionTier: 'free',
-              aiUsageLimit: 50,
+              ...update,
+              stripeCustomerId: cs.customer as string,
+              stripeSubscriptionId: cs.subscription as string,
             });
+            console.log(`✅ Tenant ${tenantId} upgraded to ${plan} (${userCount} users)`);
           }
         }
         break;
       }
 
+      // ── Subscription quantity changed (e.g. user adds seats) ────────────────
+      case 'customer.subscription.updated': {
+        const sub = event.data.object as Stripe.Subscription;
+        const tenantId = sub.metadata?.tenantId;
+        const plan = sub.metadata?.plan;
+        // Quantity comes from the line item for per-user plans
+        const quantity = sub.items.data[0]?.quantity ?? 1;
+
+        if (tenantId) {
+          if (sub.status === 'active' && plan) {
+            const update = buildPlanUpdate(plan, quantity);
+            if (update) {
+              await Tenant.findByIdAndUpdate(tenantId, update);
+              console.log(`🔄 Tenant ${tenantId} subscription updated: ${plan} × ${quantity}`);
+            }
+          } else if (sub.status === 'past_due' || sub.status === 'unpaid') {
+            await Tenant.findByIdAndUpdate(tenantId, FREE_DOWNGRADE);
+            console.log(`⚠️ Tenant ${tenantId} downgraded to free (payment issue)`);
+          }
+        }
+        break;
+      }
+
+      // ── Subscription cancelled → downgrade ────────────────────────────────
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription;
-        const tenantId = subscription.metadata?.tenantId;
+        const sub = event.data.object as Stripe.Subscription;
+        const tenantId = sub.metadata?.tenantId;
 
         if (tenantId) {
           await Tenant.findByIdAndUpdate(tenantId, {
-            subscriptionTier: 'free',
-            aiUsageLimit: 50,
+            ...FREE_DOWNGRADE,
+            stripeSubscriptionId: null,
           });
+          console.log(`❌ Tenant ${tenantId} subscription cancelled → free`);
+        }
+        break;
+      }
+
+      // ── Invoice paid (monthly renewal) ────────────────────────────────────
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as Stripe.Invoice;
+        const sub = invoice.subscription
+          ? await stripe.subscriptions.retrieve(invoice.subscription as string)
+          : null;
+
+        if (sub) {
+          const tenantId = sub.metadata?.tenantId;
+          const plan = sub.metadata?.plan;
+          const quantity = sub.items.data[0]?.quantity ?? 1;
+
+          if (tenantId && plan) {
+            const update = buildPlanUpdate(plan, quantity);
+            if (update) {
+              await Tenant.findByIdAndUpdate(tenantId, update);
+            }
+          }
         }
         break;
       }

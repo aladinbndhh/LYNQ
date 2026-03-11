@@ -18,18 +18,27 @@ const TenantSchema = new Schema<ITenant>(
     },
     subscriptionTier: {
       type: String,
-      enum: ['free', 'pro', 'enterprise'],
+      enum: ['free', 'solo', 'business'],
       default: 'free',
+    },
+    // Number of licensed seats (relevant for business plan)
+    userCount: {
+      type: Number,
+      default: 1,
     },
     aiUsageLimit: {
       type: Number,
-      default: 100, // Free tier: 100 AI messages/month
+      default: 50,
     },
     aiUsageCount: {
       type: Number,
       default: 0,
     },
     stripeCustomerId: {
+      type: String,
+      sparse: true,
+    },
+    stripeSubscriptionId: {
       type: String,
       sparse: true,
     },
@@ -57,10 +66,8 @@ const TenantSchema = new Schema<ITenant>(
   }
 );
 
-// Indexes
 TenantSchema.index({ email: 1 }, { unique: true });
 
-// Methods
 TenantSchema.methods.incrementAiUsage = async function () {
   this.aiUsageCount += 1;
   return this.save();
@@ -72,6 +79,7 @@ TenantSchema.methods.resetAiUsage = async function () {
 };
 
 TenantSchema.methods.hasAiQuota = function (): boolean {
+  if (this.aiUsageLimit === -1) return true; // unlimited
   return this.aiUsageCount < this.aiUsageLimit;
 };
 

@@ -8,10 +8,12 @@ export interface ITenant {
   _id: ObjectId;
   name: string;
   email: string;
-  subscriptionTier: 'free' | 'pro' | 'enterprise';
+  subscriptionTier: 'free' | 'solo' | 'business';
+  userCount: number;          // seats licensed (business plan)
   aiUsageLimit: number;
   aiUsageCount: number;
   stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
   odooConfig?: {
     url: string;
     database: string;

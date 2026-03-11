@@ -10,16 +10,19 @@ export async function POST(request: NextRequest) {
     await connectDB();
     const session = await requireAuth(request);
 
-    const { plan } = await request.json() as { plan: PlanKey };
+    const { plan, userCount } = await request.json() as { plan: PlanKey; userCount?: number };
 
-    if (!plan || plan === 'free') {
+    if (!plan || plan === ('free' as any)) {
       return errorResponse('Invalid plan selected', 400);
     }
 
     const planData = PLANS[plan];
     if (!planData.priceId) {
-      return errorResponse('Plan not configured', 400);
+      return errorResponse('Plan not configured. Please set the Stripe Price ID in environment variables.', 400);
     }
+
+    // For business plan, quantity = number of users (min 2)
+    const quantity = planData.perUser ? Math.max(userCount ?? 2, 2) : 1;
 
     const tenant = await Tenant.findById(session.tenantId);
     if (!tenant) return errorResponse('Tenant not found', 404);
@@ -41,13 +44,31 @@ export async function POST(request: NextRequest) {
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
-      line_items: [{ price: planData.priceId, quantity: 1 }],
+      line_items: [
+        {
+          price: planData.priceId,
+          quantity,
+        },
+      ],
       success_url: `${appUrl}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/dashboard/billing?cancelled=true`,
-      metadata: { tenantId: tenant._id.toString(), plan },
-      subscription_data: {
-        metadata: { tenantId: tenant._id.toString(), plan },
+      // Pass plan + userCount so webhook can update MongoDB correctly
+      metadata: {
+        tenantId: tenant._id.toString(),
+        plan,
+        userCount: String(quantity),
       },
+      subscription_data: {
+        metadata: {
+          tenantId: tenant._id.toString(),
+          plan,
+          userCount: String(quantity),
+        },
+      },
+      // Allow quantity adjustments for business plan in the Stripe checkout UI
+      ...(planData.perUser && {
+        allow_promotion_codes: true,
+      }),
     });
 
     return NextResponse.json({ url: checkoutSession.url });

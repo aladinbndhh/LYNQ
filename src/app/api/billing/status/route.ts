@@ -11,13 +11,14 @@ export async function GET(request: NextRequest) {
     const session = await requireAuth(request);
 
     const tenant = await Tenant.findById(session.tenantId).select(
-      'subscriptionTier aiUsageCount aiUsageLimit stripeCustomerId name email'
+      'subscriptionTier userCount aiUsageCount aiUsageLimit stripeCustomerId name email'
     );
 
     if (!tenant) return errorResponse('Tenant not found', 404);
 
     return successResponse({
       subscriptionTier: tenant.subscriptionTier,
+      userCount: tenant.userCount ?? 1,
       aiUsageCount: tenant.aiUsageCount,
       aiUsageLimit: tenant.aiUsageLimit,
       hasStripeAccount: !!tenant.stripeCustomerId,
