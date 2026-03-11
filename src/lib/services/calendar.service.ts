@@ -155,111 +155,78 @@ export class CalendarService {
     tenantContext: TenantContext
   ): Promise<IMeeting> {
     const tenant = await Tenant.findById(tenantContext.tenantId);
-    if (!tenant) {
-      throw new Error('Tenant not found');
-    }
+    if (!tenant) throw new Error('Tenant not found');
 
-    // Use the first available calendar integration
+    // Try to sync with an external calendar if one is connected — failure is non-fatal
     const integration = tenant.calendarIntegrations?.[0];
-    if (!integration) {
-      throw new Error('No calendar integration found');
-    }
-
     let externalEventId: string | undefined;
+    let calendarProvider: string = 'internal';
 
-    // Create event in external calendar
-    try {
-      if (integration.provider === 'google') {
-        const event = await createGoogleCalendarEvent(
-          integration.accessToken,
-          integration.refreshToken,
-          {
-            summary: data.title,
-            description: data.description,
-            start: {
-              dateTime: data.startTime,
-              timeZone: data.timezone,
-            },
-            end: {
-              dateTime: data.endTime,
-              timeZone: data.timezone,
-            },
-            attendees: data.attendees.map((a) => ({ email: a.email })),
-            location: data.location,
-          }
-        );
-        externalEventId = event.id || undefined;
-      } else if (integration.provider === 'outlook') {
-        const event = await createOutlookCalendarEvent(integration.accessToken, {
-          subject: data.title,
-          body: data.description
-            ? { contentType: 'text', content: data.description }
-            : undefined,
-          start: {
-            dateTime: data.startTime,
-            timeZone: data.timezone,
-          },
-          end: {
-            dateTime: data.endTime,
-            timeZone: data.timezone,
-          },
-          attendees: data.attendees.map((a) => ({
-            emailAddress: { address: a.email, name: a.name },
-          })),
-          location: data.location ? { displayName: data.location } : undefined,
-        });
-        externalEventId = event.id || undefined;
-      } else if (integration.provider === 'odoo') {
-        // Odoo calendar integration
-        if (tenant.odooConfig) {
-          try {
-            const { OdooClient } = await import('@/lib/integrations/odoo-client');
-            const client = new OdooClient({
-              url: tenant.odooConfig.url,
-              database: tenant.odooConfig.database,
-              username: '', // Would come from OAuth in production
-              password: tenant.odooConfig.accessToken || '',
-            });
-
-            // Get attendee partner IDs from Odoo (if they exist)
-            const partnerIds: number[] = [];
-            for (const attendee of data.attendees) {
-              if (attendee.email) {
-                try {
-                  const partners = await client.searchRead(
-                    'res.partner',
-                    [['email', '=', attendee.email]],
-                    ['id'],
-                    1
-                  );
-                  if (partners.length > 0) {
-                    partnerIds.push(partners[0].id);
-                  }
-                } catch (err) {
-                  // Partner doesn't exist, skip
-                }
-              }
-            }
-
-            const eventId = await client.createCalendarEvent({
-              name: data.title,
-              start: data.startTime,
-              stop: data.endTime,
-              partner_ids: partnerIds,
-              location: data.location,
+    if (integration) {
+      calendarProvider = integration.provider;
+      try {
+        if (integration.provider === 'google') {
+          const event = await createGoogleCalendarEvent(
+            integration.accessToken,
+            integration.refreshToken,
+            {
+              summary: data.title,
               description: data.description,
-            });
-            externalEventId = eventId.toString();
-          } catch (odooError) {
-            console.error('Error creating Odoo calendar event:', odooError);
+              start: { dateTime: data.startTime, timeZone: data.timezone },
+              end: { dateTime: data.endTime, timeZone: data.timezone },
+              attendees: data.attendees.map((a) => ({ email: a.email })),
+              location: data.location,
+            }
+          );
+          externalEventId = event.id || undefined;
+        } else if (integration.provider === 'outlook') {
+          const event = await createOutlookCalendarEvent(integration.accessToken, {
+            subject: data.title,
+            body: data.description
+              ? { contentType: 'text', content: data.description }
+              : undefined,
+            start: { dateTime: data.startTime, timeZone: data.timezone },
+            end: { dateTime: data.endTime, timeZone: data.timezone },
+            attendees: data.attendees.map((a) => ({
+              emailAddress: { address: a.email, name: a.name },
+            })),
+            location: data.location ? { displayName: data.location } : undefined,
+          });
+          externalEventId = event.id || undefined;
+        } else if (integration.provider === 'odoo' && tenant.odooConfig) {
+          const { OdooClient } = await import('@/lib/integrations/odoo-client');
+          const client = new OdooClient({
+            url: tenant.odooConfig.url,
+            database: tenant.odooConfig.database,
+            username: '',
+            password: tenant.odooConfig.accessToken || '',
+          });
+          const partnerIds: number[] = [];
+          for (const attendee of data.attendees) {
+            if (attendee.email) {
+              try {
+                const partners = await client.searchRead('res.partner', [['email', '=', attendee.email]], ['id'], 1);
+                if (partners.length > 0) partnerIds.push(partners[0].id);
+              } catch {}
+            }
           }
+          const eventId = await client.createCalendarEvent({
+            name: data.title,
+            start: data.startTime,
+            stop: data.endTime,
+            partner_ids: partnerIds,
+            location: data.location,
+            description: data.description,
+          });
+          externalEventId = eventId.toString();
         }
+      } catch (error) {
+        // External sync failed — still save to MongoDB
+        console.error('External calendar sync failed (meeting still saved):', error);
       }
-    } catch (error) {
-      console.error('Error creating calendar event:', error);
     }
 
-    // Create meeting record
+    // Always persist the meeting in MongoDB
     const meeting = await Meeting.create({
       tenantId: tenantContext.tenantId,
       profileId: data.profileId,
@@ -272,7 +239,7 @@ export class CalendarService {
       timezone: data.timezone,
       attendees: data.attendees,
       location: data.location,
-      calendarProvider: integration.provider,
+      calendarProvider,
       externalEventId,
       status: 'scheduled',
     });

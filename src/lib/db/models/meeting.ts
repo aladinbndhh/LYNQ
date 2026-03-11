@@ -69,8 +69,8 @@ const MeetingSchema = new Schema<IMeeting>(
     },
     calendarProvider: {
       type: String,
-      enum: ['google', 'outlook', 'odoo'],
-      required: true,
+      enum: ['google', 'outlook', 'odoo', 'internal'],
+      default: 'internal',
     },
     externalEventId: {
       type: String,
