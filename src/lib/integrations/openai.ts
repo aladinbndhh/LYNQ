@@ -3,7 +3,7 @@
  * Model: NVIDIA Nemotron Nano 30B A3B (free tier)
  */
 
-export const AI_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
+export const AI_MODEL = 'nvidia/nemotron-3-nano-30b-a3b:free';
 export const AI_MAX_TOKENS = 1000;
 export const AI_TEMPERATURE = 0.7;
 
