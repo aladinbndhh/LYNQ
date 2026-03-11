@@ -2,12 +2,32 @@ import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import connectDB from '@/lib/db/connection';
-import { User, Tenant } from '@/lib/db/models';
+import { User, Tenant, Profile } from '@/lib/db/models';
 import { verifyPassword, hashPassword } from '@/lib/utils/auth';
+
+/** Generate a unique username from a display name / email prefix */
+async function generateUsername(base: string): Promise<string> {
+  const sanitized = base
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 30) || 'user';
+
+  // Try the base first, then append numbers until unique
+  let candidate = sanitized;
+  let attempt = 0;
+  while (await Profile.exists({ username: candidate })) {
+    attempt++;
+    candidate = `${sanitized}-${attempt}`;
+  }
+  return candidate;
+}
 
 /**
  * Find or create a MongoDB user+tenant from a Google OAuth profile.
- * Returns { userId, tenantId, name, role }.
+ * On first sign-in, also creates a default Profile pre-filled with
+ * the user's Google name, email, and profile picture.
  */
 async function findOrCreateGoogleUser(profile: {
   email: string;
@@ -18,6 +38,13 @@ async function findOrCreateGoogleUser(profile: {
 
   let user = await User.findOne({ email: profile.email.toLowerCase() });
   if (user) {
+    // Update avatar URL in case it changed
+    if (profile.image) {
+      await Profile.updateOne(
+        { userId: user._id },
+        { $setOnInsert: { avatar: profile.image } }
+      );
+    }
     return {
       userId: user._id.toString(),
       tenantId: user.tenantId.toString(),
@@ -42,7 +69,7 @@ async function findOrCreateGoogleUser(profile: {
     aiUsageCount: 0,
   });
 
-  // Random password hash for Google-only accounts (they'll never use it)
+  // Random password hash — Google-only accounts never need it
   const passwordHash = await hashPassword(crypto.randomUUID());
 
   user = await User.create({
@@ -52,6 +79,37 @@ async function findOrCreateGoogleUser(profile: {
     name: profile.name,
     role: 'admin',
   });
+
+  // Auto-create a default Profile pre-filled with Google data
+  try {
+    const emailPrefix = profile.email.split('@')[0];
+    const username = await generateUsername(profile.name || emailPrefix);
+
+    await Profile.create({
+      tenantId: tenant._id,
+      userId: user._id,
+      username,
+      displayName: profile.name,
+      avatar: profile.image || '',
+      contactInfo: {
+        email: profile.email.toLowerCase(),
+      },
+      branding: { primaryColor: '#3b82f6', theme: 'light' },
+      aiConfig: {
+        enabled: true,
+        personality: 'professional and friendly',
+        greeting: `Hi! I'm ${profile.name}'s AI assistant. How can I help you today?`,
+        qualificationQuestions: ['What brings you here today?', 'Which industry are you in?'],
+        autoBooking: true,
+      },
+      isPublic: true,
+      language: 'en',
+      timezone: 'UTC',
+    });
+  } catch (err) {
+    // Profile creation is non-fatal — user can create one manually
+    console.warn('Auto-profile creation failed:', err);
+  }
 
   return {
     userId: user._id.toString(),

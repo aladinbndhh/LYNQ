@@ -10,11 +10,5 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  return (
-    <ModernDashboard
-      userName={session.user.name || 'User'}
-      userEmail={session.user.email || undefined}
-      userAvatar={(session.user as any).image || undefined}
-    />
-  );
+  return <ModernDashboard userName={session.user.name || 'User'} />;
 }

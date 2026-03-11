@@ -2,12 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { signOut } from 'next-auth/react';
 import {
   Eye, Users, Calendar, TrendingUp, TrendingDown,
-  UserCircle, FileText, CalendarCheck, Settings,
+  FileText, CalendarCheck,
   BarChart3, Mail, ArrowRight, Sparkles,
-  CreditCard, Zap, LogOut, ChevronDown,
+  CreditCard, Zap,
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -20,8 +19,6 @@ interface DashboardStats {
 
 interface ModernDashboardProps {
   userName: string;
-  userEmail?: string;
-  userAvatar?: string;
 }
 
 function StatCard({ title, value, sub, changePercent, icon, color }: {
@@ -65,10 +62,9 @@ function QuickAction({ title, description, icon, href, color }: {
   );
 }
 
-export function ModernDashboard({ userName, userEmail, userAvatar }: ModernDashboardProps) {
+export function ModernDashboard({ userName }: ModernDashboardProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/dashboard/stats')
@@ -118,87 +114,8 @@ export function ModernDashboard({ userName, userEmail, userAvatar }: ModernDashb
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-5 h-16 flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-rose-500 rounded-xl flex items-center justify-center">
-              <CreditCard className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-lg font-extrabold bg-gradient-to-r from-indigo-500 to-rose-500 bg-clip-text text-transparent">
-              LynQ
-            </span>
-          </div>
-
-          {/* Nav links */}
-          <nav className="hidden md:flex items-center gap-1">
-            {[
-              { label: 'Dashboard', href: '/dashboard' },
-              { label: 'Cards', href: '/dashboard/profiles' },
-              { label: 'Leads', href: '/dashboard/leads' },
-              { label: 'Analytics', href: '/dashboard/analytics' },
-            ].map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* User menu */}
-          <div className="relative">
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-muted/50 transition-colors"
-            >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-rose-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                {userAvatar ? (
-                  <img src={userAvatar} alt="" className="w-full h-full rounded-full object-cover" />
-                ) : (
-                  userName.charAt(0).toUpperCase()
-                )}
-              </div>
-              <span className="hidden md:block text-sm font-medium text-foreground max-w-[120px] truncate">
-                {userName}
-              </span>
-              <ChevronDown className="w-4 h-4 text-muted-foreground hidden md:block" />
-            </button>
-
-            {menuOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 w-52 bg-card border border-border rounded-xl shadow-lg z-20 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border">
-                    <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
-                    {userEmail && <p className="text-xs text-muted-foreground truncate">{userEmail}</p>}
-                  </div>
-                  <Link href="/dashboard/settings" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm text-foreground hover:bg-muted/50 transition-colors">
-                    <Settings className="w-4 h-4 text-muted-foreground" /> Settings
-                  </Link>
-                  <Link href="/dashboard/billing" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm text-foreground hover:bg-muted/50 transition-colors">
-                    <Zap className="w-4 h-4 text-muted-foreground" /> Billing
-                  </Link>
-                  <div className="border-t border-border">
-                    <button
-                      onClick={() => signOut({ callbackUrl: '/login' })}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
-                    >
-                      <LogOut className="w-4 h-4" /> Sign Out
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-5 py-8">
+    <>
+      <main className="max-w-7xl mx-auto px-4 sm:px-5 py-8">
         {/* Welcome */}
         <div className="mb-8">
           <h1 className="text-3xl font-extrabold text-foreground">
@@ -307,6 +224,6 @@ export function ModernDashboard({ userName, userEmail, userAvatar }: ModernDashb
           </div>
         </div>
       </main>
-    </div>
+    </>
   );
 }
