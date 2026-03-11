@@ -161,7 +161,7 @@ export interface IMeeting {
   }>;
   location?: string;
   videoLink?: string;
-  calendarProvider: 'google' | 'outlook' | 'odoo';
+  calendarProvider: 'google' | 'outlook' | 'odoo' | 'internal';
   externalEventId?: string;
   status: 'scheduled' | 'confirmed' | 'cancelled' | 'completed';
   odooActivityId?: number;
