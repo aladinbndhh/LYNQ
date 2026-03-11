@@ -1,15 +1,10 @@
-import { Types } from 'mongoose';
-import { genAI, AI_MODEL, AI_TEMPERATURE } from '@/lib/integrations/openai';
-import { Conversation, Profile, Tenant } from '@/lib/db/models';
+import { callOpenRouter, AI_TEMPERATURE, ChatMessage } from '@/lib/integrations/openai';
+import { Conversation, Profile } from '@/lib/db/models';
 import { IConversation, IProfile } from '@/types';
 import { CalendarService } from './calendar.service';
 import { LeadService } from './lead.service';
-import { cacheGet, cacheSet } from '@/lib/utils/redis';
 
 export class AISecretaryService {
-  /**
-   * Send a message to the AI and get a response
-   */
   static async chat(data: {
     profileId: string;
     sessionId: string;
@@ -25,13 +20,9 @@ export class AISecretaryService {
     state: IConversation['status'];
     conversation: IConversation;
   }> {
-    // Get profile
     const profile = await Profile.findById(data.profileId).populate('tenantId');
-    if (!profile) {
-      throw new Error('Profile not found');
-    }
+    if (!profile) throw new Error('Profile not found');
 
-    // Check AI quota
     const tenant = profile.tenantId as any;
     if (!tenant.hasAiQuota()) {
       throw new Error('AI usage limit exceeded. Please upgrade your plan.');
@@ -54,87 +45,43 @@ export class AISecretaryService {
       });
     }
 
-    // Update lead info if provided
     if (data.visitorInfo) {
-      conversation.leadInfo = {
-        ...conversation.leadInfo,
-        ...data.visitorInfo,
-      };
+      conversation.leadInfo = { ...conversation.leadInfo, ...data.visitorInfo };
     }
 
-    // Add user message
+    // Build OpenAI-style messages array
+    const systemPrompt = this.buildSystemPrompt(profile);
+
+    const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }];
+
+    // Append prior conversation turns
+    for (const m of conversation.messages) {
+      messages.push({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.content,
+      });
+    }
+
+    // Append the new user message
+    messages.push({ role: 'user', content: data.message });
+
+    // Save user message to conversation
     conversation.messages.push({
       role: 'user',
       content: data.message,
       timestamp: new Date(),
     });
 
-    // Build system prompt
-    const systemPrompt = this.buildSystemPrompt(profile);
-
-    // Build chat history for Gemini
-    const chatHistory = conversation.messages
-      .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-      .join('\n');
-
-    const fullPrompt = `${systemPrompt}\n\nConversation so far:\n${chatHistory}\n\nUser: ${data.message}\n\nAssistant:`;
-
     try {
-      // Call Google Gemini API using v1 API (not v1beta)
-      // The SDK v0.22+ automatically uses v1 API endpoints
-      const model = genAI.getGenerativeModel({ model: AI_MODEL });
-      
-      // Build function definitions for Gemini (tools parameter)
-      const tools = this.buildGeminiTools();
-      
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-        tools: tools.length > 0 ? tools : undefined,
-        generationConfig: {
-          temperature: AI_TEMPERATURE,
-          maxOutputTokens: 1000,
-        },
+      const assistantReply = await callOpenRouter(messages, {
+        temperature: AI_TEMPERATURE,
+        max_tokens: 1000,
       });
 
-      const response = result.response;
-      let assistantReply = response.text();
-      
-      // Check if Gemini wants to call a function
-      try {
-        const functionCalls = response.functionCalls();
-        if (functionCalls && functionCalls.length > 0) {
-          // Execute function calls
-          for (const functionCall of functionCalls) {
-            const functionResult = await this.executeFunctionCall(
-              functionCall.name,
-              functionCall.args as any,
-              profile,
-              conversation
-            );
-            
-            // Get follow-up response from AI with function result
-            const followUpResult = await model.generateContent({
-              contents: [
-                { role: 'user', parts: [{ text: fullPrompt }] },
-                { role: 'model', parts: [{ text: assistantReply }, { functionCall: functionCall }] },
-                { role: 'function', parts: [{ functionResponse: { name: functionCall.name, response: functionResult } }] },
-              ],
-              tools: tools.length > 0 ? tools : undefined,
-              generationConfig: {
-                temperature: AI_TEMPERATURE,
-                maxOutputTokens: 1000,
-              },
-            });
-            
-            assistantReply = followUpResult.response.text();
-          }
-        }
-      } catch (functionError) {
-        // If function calling fails, continue with text response
-        console.warn('Function calling not available or failed, using text-only mode:', functionError);
-      }
+      // Check for action keywords and handle side-effects
+      await this.handleActionKeywords(assistantReply, profile, conversation);
 
-      // Add AI response to conversation
+      // Save assistant reply
       conversation.messages.push({
         role: 'assistant',
         content: assistantReply,
@@ -142,19 +89,7 @@ export class AISecretaryService {
       });
 
       await conversation.save();
-
-      // Increment AI usage
       await tenant.incrementAiUsage();
-
-      // Check if AI suggests meeting booking (simple parsing for MVP)
-      const lowerReply = assistantReply.toLowerCase();
-      if (lowerReply.includes('book') || lowerReply.includes('schedule') || lowerReply.includes('meeting')) {
-        // Update status to show booking intent
-        if (conversation.leadInfo?.email) {
-          conversation.status = 'qualified';
-          await conversation.save();
-        }
-      }
 
       return {
         reply: assistantReply,
@@ -169,437 +104,57 @@ export class AISecretaryService {
   }
 
   /**
-   * Build system prompt from profile configuration
+   * Detect booking/escalation intent from reply text and act on it.
    */
+  private static async handleActionKeywords(
+    reply: string,
+    profile: IProfile,
+    conversation: IConversation
+  ) {
+    const lower = reply.toLowerCase();
+
+    if (
+      (lower.includes('escalat') || lower.includes('transfer') || lower.includes('human agent')) &&
+      conversation.status !== 'escalated'
+    ) {
+      conversation.status = 'escalated';
+      return;
+    }
+
+    if (
+      (lower.includes('book') || lower.includes('schedule') || lower.includes('confirm')) &&
+      conversation.leadInfo?.email &&
+      conversation.status === 'active'
+    ) {
+      conversation.status = 'qualified';
+    }
+  }
+
   private static buildSystemPrompt(profile: IProfile): string {
     const { aiConfig, displayName, title, company } = profile;
 
-    return `You are an AI secretary for ${displayName}, a ${title} at ${company}.
+    return `You are an AI secretary for ${displayName}, ${title} at ${company}.
 
-Your role:
-1. Greet visitors warmly and professionally
-2. Collect their name, company, and reason for meeting
-3. Qualify leads by asking: ${aiConfig.qualificationQuestions.join(', ')}
-4. If qualified, propose available meeting times
-5. Book meetings automatically if visitor confirms
-6. If you cannot help, politely escalate to human
+Your goals:
+1. Greet visitors warmly and professionally.
+2. Collect their name, company, and reason for contacting.
+3. Qualify them by asking: ${aiConfig.qualificationQuestions.join(', ')}.
+4. If qualified, propose scheduling a meeting and collect their email.
+5. If you cannot help or the visitor is frustrated, escalate to a human.
 
 Rules:
-- Never hallucinate meeting times - only use slots from checkAvailability function
-- Never confirm bookings without explicit visitor consent
-- Be concise and professional (2-3 sentences max per response)
-- Ask one question at a time
-- If visitor seems frustrated or requests human, escalate immediately
-- Use visitor's timezone for all times
-- Confirm all details before booking
-- Personality: ${aiConfig.personality}
-
-Initial greeting: "${aiConfig.greeting}"
-
-Available functions:
-- checkAvailability(date, duration, timezone) -> returns available meeting slots
-- bookMeeting(startTime, endTime, attendee, notes) -> books a meeting
-- escalateToHuman(reason) -> escalates to profile owner`;
+- Be concise (2–3 sentences max per response).
+- Ask one question at a time.
+- Never invent meeting times; only suggest times you've confirmed.
+- Always confirm details before committing to anything.
+- Personality style: ${aiConfig.personality}.
+- Opening greeting: "${aiConfig.greeting}"`;
   }
 
-  /**
-   * Build Gemini tools (function definitions)
-   */
-  private static buildGeminiTools(): any[] {
-    return [
-      {
-        functionDeclarations: [
-          {
-            name: 'checkAvailability',
-            description: 'Check calendar availability for meeting slots on a specific date',
-            parameters: {
-              type: 'object',
-              properties: {
-                date: {
-                  type: 'string',
-                  description: 'Date in YYYY-MM-DD format',
-                },
-                duration: {
-                  type: 'number',
-                  description: 'Meeting duration in minutes (default: 30)',
-                },
-                timezone: {
-                  type: 'string',
-                  description: 'Visitor timezone (IANA format, e.g., America/New_York)',
-                },
-              },
-              required: ['date', 'timezone'],
-            },
-          },
-          {
-            name: 'bookMeeting',
-            description: 'Book a confirmed meeting after visitor approval',
-            parameters: {
-              type: 'object',
-              properties: {
-                startTime: {
-                  type: 'string',
-                  description: 'Meeting start time in ISO 8601 format',
-                },
-                endTime: {
-                  type: 'string',
-                  description: 'Meeting end time in ISO 8601 format',
-                },
-                attendee: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    email: { type: 'string' },
-                  },
-                  required: ['name', 'email'],
-                },
-                notes: {
-                  type: 'string',
-                  description: 'Meeting notes or agenda',
-                },
-              },
-              required: ['startTime', 'endTime', 'attendee'],
-            },
-          },
-          {
-            name: 'escalateToHuman',
-            description: 'Escalate conversation to profile owner when visitor needs human assistance',
-            parameters: {
-              type: 'object',
-              properties: {
-                reason: {
-                  type: 'string',
-                  description: 'Reason for escalation',
-                },
-              },
-              required: ['reason'],
-            },
-          },
-        ],
-      },
-    ];
-  }
-
-  /**
-   * Build OpenAI function definitions (legacy, kept for reference)
-   */
-  private static buildFunctions(): any[] {
-    return [
-      {
-        name: 'checkAvailability',
-        description: 'Check calendar availability for meeting slots',
-        parameters: {
-          type: 'object',
-          properties: {
-            date: {
-              type: 'string',
-              description: 'Date in YYYY-MM-DD format',
-            },
-            duration: {
-              type: 'number',
-              description: 'Meeting duration in minutes (default: 30)',
-            },
-            timezone: {
-              type: 'string',
-              description: 'Visitor timezone (IANA format, e.g., America/New_York)',
-            },
-          },
-          required: ['date', 'timezone'],
-        },
-      },
-      {
-        name: 'bookMeeting',
-        description: 'Book a confirmed meeting after visitor approval',
-        parameters: {
-          type: 'object',
-          properties: {
-            startTime: {
-              type: 'string',
-              description: 'Meeting start time in ISO 8601 format',
-            },
-            endTime: {
-              type: 'string',
-              description: 'Meeting end time in ISO 8601 format',
-            },
-            attendee: {
-              type: 'object',
-              properties: {
-                name: { type: 'string' },
-                email: { type: 'string' },
-              },
-              required: ['name', 'email'],
-            },
-            notes: {
-              type: 'string',
-              description: 'Meeting notes or agenda',
-            },
-          },
-          required: ['startTime', 'endTime', 'attendee'],
-        },
-      },
-      {
-        name: 'escalateToHuman',
-        description: 'Escalate conversation to profile owner',
-        parameters: {
-          type: 'object',
-          properties: {
-            reason: {
-              type: 'string',
-              description: 'Reason for escalation',
-            },
-          },
-          required: ['reason'],
-        },
-      },
-    ];
-  }
-
-  /**
-   * Execute function call
-   */
-  private static async executeFunctionCall(
-    functionName: string,
-    args: any,
-    profile: IProfile,
-    conversation: IConversation
-  ): Promise<any> {
-    switch (functionName) {
-      case 'checkAvailability':
-        return this.handleCheckAvailability(args, profile);
-
-      case 'bookMeeting':
-        return this.handleBookMeeting(args, profile, conversation);
-
-      case 'escalateToHuman':
-        return this.handleEscalateToHuman(args, conversation);
-
-      default:
-        return { error: 'Unknown function' };
-    }
-  }
-
-  /**
-   * Handle checkAvailability function
-   */
-  private static async handleCheckAvailability(
-    args: { date: string; duration?: number; timezone: string },
-    profile: IProfile
-  ): Promise<any> {
-    try {
-      const duration = args.duration || 30;
-      
-      // Get tenant context for calendar service
-      const tenant = profile.tenantId as any;
-      // Create a minimal system context for visitor-initiated calls
-      const systemUser = {
-        id: 'system',
-        email: '',
-        name: 'System',
-        tenantId: (tenant._id || tenant).toString(),
-        role: 'admin' as const,
-      };
-      const { createTenantContext } = await import('@/lib/middleware/tenant');
-      const tenantContext = createTenantContext(systemUser);
-
-      // Call CalendarService to get real availability
-      const profileId = profile.id?.toString() || profile._id?.toString();
-      if (!profileId) {
-        throw new Error('Profile ID is required');
-      }
-      
-      const slots = await CalendarService.getAvailability({
-        profileId,
-        date: args.date,
-        duration,
-        timezone: args.timezone,
-        tenantContext,
-      });
-
-      return {
-        success: true,
-        slots: slots.map(slot => ({
-          start: slot.start,
-          end: slot.end,
-        })),
-        timezone: args.timezone,
-      };
-    } catch (error: any) {
-      console.error('Error checking availability:', error);
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-
-  /**
-   * Handle bookMeeting function
-   */
-  private static async handleBookMeeting(
-    args: {
-      startTime: string;
-      endTime: string;
-      attendee: { name: string; email: string };
-      notes?: string;
-    },
-    profile: IProfile,
-    conversation: IConversation
-  ): Promise<any> {
-    try {
-      // Get tenant context
-      const tenant = profile.tenantId as any;
-      // Create a minimal system context for visitor-initiated calls
-      const systemUser = {
-        id: 'system',
-        email: '',
-        name: 'System',
-        tenantId: (tenant._id || tenant).toString(),
-        role: 'admin' as const,
-      };
-      const { createTenantContext } = await import('@/lib/middleware/tenant');
-      const tenantContext = createTenantContext(systemUser);
-
-      // Create lead if we have visitor info
-      const profileId = profile.id?.toString() || profile._id?.toString();
-      const conversationId = conversation._id?.toString();
-      
-      if (!profileId) {
-        throw new Error('Profile ID is required');
-      }
-      
-      let leadId: string | undefined;
-      if (conversation.leadInfo?.email) {
-        // Convert profileId to ObjectId if it's a string
-        const { Types } = await import('mongoose');
-        let profileIdObj: Types.ObjectId | null = null;
-        
-        if (profile._id instanceof Types.ObjectId) {
-          profileIdObj = profile._id;
-        } else if (profile._id) {
-          profileIdObj = new Types.ObjectId(String(profile._id));
-        } else if (profile.id) {
-          profileIdObj = new Types.ObjectId(String(profile.id));
-        }
-        
-        let conversationIdObj: Types.ObjectId | undefined = undefined;
-        if (conversation._id instanceof Types.ObjectId) {
-          conversationIdObj = conversation._id;
-        } else if (conversation._id) {
-          conversationIdObj = new Types.ObjectId(String(conversation._id));
-        }
-        
-        if (!profileIdObj) {
-          throw new Error('Invalid profile ID');
-        }
-        
-        const lead = await LeadService.createLead(
-          {
-            profileId: profileIdObj,
-            conversationId: conversationIdObj,
-            name: conversation.leadInfo.name || args.attendee.name,
-            email: conversation.leadInfo.email || args.attendee.email,
-            company: conversation.leadInfo.company,
-            intent: conversation.leadInfo.intent,
-            source: 'chat',
-            status: 'qualified',
-          },
-          tenantContext
-        );
-        leadId = lead._id?.toString() || '';
-      }
-
-      // Book meeting using CalendarService
-      const meeting = await CalendarService.bookMeeting(
-        {
-          profileId,
-          leadId,
-          conversationId: conversationId || '',
-          title: `Meeting with ${args.attendee.name}`,
-          description: args.notes || `Meeting scheduled via AI chat`,
-          startTime: args.startTime,
-          endTime: args.endTime,
-          timezone: profile.timezone || 'UTC',
-          attendees: [args.attendee],
-        },
-        tenantContext
-      );
-
-      // Update conversation status
-      conversation.status = 'booked';
-      await (conversation as any).save();
-
-      const meetingId = meeting._id?.toString() || '';
-      
-      return {
-        success: true,
-        message: 'Meeting booked successfully',
-        meetingId,
-        startTime: args.startTime,
-        endTime: args.endTime,
-      };
-    } catch (error: any) {
-      console.error('Error booking meeting:', error);
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-
-  /**
-   * Handle escalateToHuman function
-   */
-  private static async handleEscalateToHuman(
-    args: { reason: string },
-    conversation: IConversation
-  ): Promise<any> {
-    conversation.status = 'escalated';
-    await (conversation as any).save();
-
-    // Send notification to profile owner
-    try {
-      const profile = await Profile.findById(conversation.profileId).populate('userId');
-      if (profile && (profile as any).userId?.email) {
-        // In production, this would send an email notification
-        // For now, we log it - email service can be added later
-        const profileIdStr = profile.id?.toString() || profile._id?.toString() || 'unknown';
-        const conversationIdStr = conversation._id?.toString() || 'unknown';
-        
-        console.log(`Escalation notification for profile ${profileIdStr}:`, {
-          reason: args.reason,
-          visitorEmail: conversation.leadInfo?.email,
-          conversationId: conversationIdStr,
-          profileOwnerEmail: (profile as any).userId?.email,
-        });
-        
-        // TODO: Integrate with email service (nodemailer) to send actual notification
-        // await EmailService.sendEscalationNotification({
-        //   to: (profile as any).userId.email,
-        //   profileName: profile.displayName,
-        //   reason: args.reason,
-        //   visitorInfo: conversation.leadInfo,
-        // });
-      }
-    } catch (error) {
-      console.error('Error sending escalation notification:', error);
-    }
-
-    return {
-      success: true,
-      message: 'Escalated to human',
-    };
-  }
-
-  /**
-   * Get conversation history
-   */
   static async getConversation(
     profileId: string,
     sessionId: string
   ): Promise<IConversation | null> {
-    return Conversation.findOne({
-      profileId,
-      visitorId: sessionId,
-    });
+    return Conversation.findOne({ profileId, visitorId: sessionId });
   }
 }
