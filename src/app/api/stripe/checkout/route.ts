@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
+      currency: 'qar',
       line_items: [
         {
           price: planData.priceId,

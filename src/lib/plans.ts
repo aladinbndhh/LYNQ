@@ -7,7 +7,7 @@ export const PLANS = {
   solo: {
     name: 'Solo',
     description: 'Perfect for individuals and freelancers',
-    price: 19,           // fixed monthly price
+    price: 19,           // fixed monthly price in QAR
     priceId: process.env.STRIPE_SOLO_PRICE_ID as string | undefined,
     perUser: false,
     maxUsers: 1,
@@ -27,7 +27,7 @@ export const PLANS = {
   business: {
     name: 'Business',
     description: 'For teams — billed per active user',
-    price: 12,           // price PER USER per month
+    price: 12,           // price PER USER per month in QAR
     priceId: process.env.STRIPE_BUSINESS_PRICE_ID as string | undefined,
     perUser: true,
     maxUsers: -1,        // unlimited

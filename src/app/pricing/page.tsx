@@ -3,27 +3,11 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ChevronDown, Sparkles, ArrowRight } from 'lucide-react';
+import { Check, ChevronDown, Sparkles, ArrowRight, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-
-interface PricingFeature {
-  text: string;
-  included: boolean;
-}
-
-interface PricingTier {
-  name: string;
-  description: string;
-  price: number;
-  yearlyPrice: number;
-  aiLimit: string;
-  features: PricingFeature[];
-  buttonText: string;
-  buttonLink: string;
-  isPopular?: boolean;
-}
+import { PLANS } from '@/lib/plans';
 
 interface FAQItem {
   question: string;
@@ -76,191 +60,34 @@ const FAQItemComponent: React.FC<{ item: FAQItem; index: number }> = ({ item, in
   );
 };
 
-const PricingCard: React.FC<{ tier: PricingTier; isYearly: boolean; index: number }> = ({
-  tier,
-  isYearly,
-  index,
-}) => {
-  const price = isYearly ? tier.yearlyPrice : tier.price;
-  const savings = isYearly
-    ? Math.round(((tier.price * 12 - tier.yearlyPrice) / (tier.price * 12)) * 100)
-    : 0;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
-    >
-      <Card
-        className={cn(
-          'relative h-full overflow-hidden border p-6 transition-all duration-300',
-          tier.isPopular
-            ? 'border-primary shadow-lg shadow-primary/20 scale-105'
-            : 'border-border hover:border-primary/50'
-        )}
-      >
-        {tier.isPopular && (
-          <div className="absolute top-0 right-0 bg-gradient-to-r from-indigo-500 to-rose-500 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg flex items-center gap-1">
-            <Sparkles className="h-3 w-3" />
-            Most Popular
-          </div>
-        )}
-
-        <div className="mb-6">
-          <h3 className="text-2xl font-bold mb-2">{tier.name}</h3>
-          <p className="text-sm text-muted-foreground">{tier.description}</p>
-        </div>
-
-        <div className="mb-6">
-          <div className="flex items-baseline gap-1">
-            <span className="text-4xl font-bold">${price}</span>
-            <span className="text-muted-foreground">/{isYearly ? 'year' : 'month'}</span>
-          </div>
-          {isYearly && savings > 0 && (
-            <p className="text-xs text-green-600 mt-1">Save {savings}% annually</p>
-          )}
-        </div>
-
-        <div className="mb-6 p-3 bg-muted/50 rounded-lg">
-          <p className="text-sm font-medium text-foreground">{tier.aiLimit}</p>
-        </div>
-
-        <Link href={tier.buttonLink}>
-          <Button
-            className={cn(
-              'w-full mb-6',
-              tier.isPopular && 'bg-gradient-to-r from-indigo-500 to-rose-500 hover:from-indigo-600 hover:to-rose-600'
-            )}
-            variant={tier.isPopular ? 'default' : 'outline'}
-          >
-            {tier.buttonText}
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-        </Link>
-
-        <div className="space-y-3">
-          {tier.features.map((feature, idx) => (
-            <div key={idx} className="flex items-start gap-3">
-              {feature.included ? (
-                <div className="mt-0.5 rounded-full bg-green-100 dark:bg-green-900/30 p-1">
-                  <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
-                </div>
-              ) : (
-                <div className="mt-0.5 rounded-full bg-muted p-1">
-                  <Check className="h-3 w-3 text-muted-foreground opacity-30" />
-                </div>
-              )}
-              <span
-                className={cn(
-                  'text-sm',
-                  feature.included ? 'text-foreground' : 'text-muted-foreground line-through'
-                )}
-              >
-                {feature.text}
-              </span>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </motion.div>
-  );
-};
-
 export default function PricingPage() {
-  const [isYearly, setIsYearly] = React.useState(false);
-
-  const pricingTiers: PricingTier[] = [
-    {
-      name: 'Free',
-      description: 'Perfect for trying out LynQ',
-      price: 0,
-      yearlyPrice: 0,
-      aiLimit: '100 AI messages/month',
-      features: [
-        { text: '1 digital profile', included: true },
-        { text: 'QR code generation', included: true },
-        { text: 'Basic AI secretary', included: true },
-        { text: 'Lead capture', included: true },
-        { text: 'Email signature', included: true },
-        { text: 'Calendar integration', included: false },
-        { text: 'Odoo integration', included: false },
-        { text: 'Priority support', included: false },
-      ],
-      buttonText: 'Get Started Free',
-      buttonLink: '/signup',
-    },
-    {
-      name: 'Pro',
-      description: 'For professionals and sales teams',
-      price: 29,
-      yearlyPrice: 290,
-      aiLimit: '1,000 AI messages/month',
-      features: [
-        { text: 'Unlimited digital profiles', included: true },
-        { text: 'QR code generation', included: true },
-        { text: 'Advanced AI secretary', included: true },
-        { text: 'Unlimited lead capture', included: true },
-        { text: 'Email signatures', included: true },
-        { text: 'Google & Outlook Calendar', included: true },
-        { text: 'Analytics dashboard', included: true },
-        { text: 'Priority email support', included: true },
-      ],
-      buttonText: 'Start Pro Trial',
-      buttonLink: '/signup?plan=pro',
-      isPopular: true,
-    },
-    {
-      name: 'Enterprise',
-      description: 'For large organizations',
-      price: 99,
-      yearlyPrice: 990,
-      aiLimit: 'Unlimited AI messages',
-      features: [
-        { text: 'Everything in Pro', included: true },
-        { text: 'Odoo CRM integration', included: true },
-        { text: 'Custom AI training', included: true },
-        { text: 'White-label branding', included: true },
-        { text: 'Advanced analytics', included: true },
-        { text: 'API access', included: true },
-        { text: 'Dedicated account manager', included: true },
-        { text: '24/7 priority support', included: true },
-      ],
-      buttonText: 'Contact Sales',
-      buttonLink: '/contact',
-    },
-  ];
+  const [businessUsers, setBusinessUsers] = React.useState(5);
+  const businessTotal = businessUsers * PLANS.business.price;
 
   const faqs: FAQItem[] = [
     {
-      question: 'Can I change my plan later?',
-      answer:
-        "Yes! You can upgrade or downgrade your plan at any time. Changes will be reflected in your next billing cycle.",
+      question: 'Can I switch between Solo and Business?',
+      answer: 'Yes. You can upgrade or downgrade at any time from the billing portal. Stripe prorates any difference automatically.',
     },
     {
-      question: 'What happens if I exceed my AI usage limit?',
-      answer:
-        'If you exceed your monthly limit, you can upgrade to a higher tier or wait until the next billing cycle. Pro users get 1,000 messages/month, Enterprise gets unlimited.',
+      question: 'How does Business billing work?',
+      answer: `You choose how many seats you need and pay QAR ${PLANS.business.price} per user per month. You can add or remove seats at any time.`,
     },
     {
       question: 'Do you offer refunds?',
-      answer:
-        "We offer a 30-day money-back guarantee for all paid plans. If you're not satisfied, contact support for a full refund.",
+      answer: 'We offer a 30-day money-back guarantee for all paid plans. Contact support for a full refund.',
     },
     {
-      question: 'Is there a free trial for paid plans?',
-      answer:
-        'Yes! Pro and Enterprise plans come with a 14-day free trial. No credit card required to start your trial.',
+      question: 'Is there a free trial?',
+      answer: 'Yes — both plans come with a 14-day free trial. No credit card required to start.',
     },
     {
       question: 'What calendar providers do you support?',
-      answer:
-        'We support Google Calendar, Outlook/Microsoft 365, and Odoo Calendar. Enterprise customers can request additional integrations.',
+      answer: 'Google Calendar, Outlook / Microsoft 365, and Odoo Calendar. Business customers can request additional integrations.',
     },
     {
       question: 'Can I use my own company branding?',
-      answer:
-        'Yes! All plans support custom branding including your company logo badge, primary colors, and custom domains (Enterprise).',
+      answer: 'Yes. All plans support custom branding including your company logo, primary colors, and custom themes. Business plans include a white-label option.',
     },
   ];
 
@@ -285,9 +112,9 @@ export default function PricingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* Hero */}
       <section className="py-20 px-4">
-        <div className="max-w-7xl mx-auto text-center">
+        <div className="max-w-4xl mx-auto text-center">
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -299,53 +126,119 @@ export default function PricingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-lg text-muted-foreground mb-8"
+            className="text-lg text-muted-foreground"
           >
-            Choose the perfect plan for your smart digital identity needs
+            All prices in <span className="font-semibold text-foreground">QAR</span>. No hidden fees.
           </motion.p>
+        </div>
+      </section>
 
-          {/* Billing Toggle */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="flex items-center justify-center gap-3 mb-12"
-          >
-            <span className={cn('text-sm font-medium', !isYearly && 'text-foreground')}>
-              Monthly
-            </span>
-            <button
-              onClick={() => setIsYearly(!isYearly)}
-              className={cn(
-                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-                isYearly ? 'bg-primary' : 'bg-muted'
-              )}
-            >
-              <span
-                className={cn(
-                  'inline-block h-4 w-4 transform rounded-full bg-background transition-transform',
-                  isYearly ? 'translate-x-6' : 'translate-x-1'
-                )}
-              />
-            </button>
-            <span className={cn('text-sm font-medium', isYearly && 'text-foreground')}>
-              Yearly
-              <span className="ml-1 text-green-600 text-xs">(Save 17%)</span>
-            </span>
+      {/* Pricing cards */}
+      <section className="pb-20 px-4">
+        <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-8">
+
+          {/* ── Solo ───────────────────────────────────────────────────── */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <Card className="relative h-full border-border hover:border-primary/50 transition-all duration-300 p-7 flex flex-col">
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold mb-1">{PLANS.solo.name}</h3>
+                <p className="text-sm text-muted-foreground">{PLANS.solo.description}</p>
+              </div>
+              <div className="mb-6">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-sm font-medium text-muted-foreground">QAR</span>
+                  <span className="text-4xl font-bold">{PLANS.solo.price}</span>
+                  <span className="text-muted-foreground">/month</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">1 user · fixed price</p>
+              </div>
+
+              <div className="space-y-3 mb-8 flex-1">
+                {PLANS.solo.features.map((f) => (
+                  <div key={f} className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-full bg-green-500/20 p-1 flex-shrink-0">
+                      <Check className="h-3 w-3 text-green-400" />
+                    </div>
+                    <span className="text-sm text-foreground">{f}</span>
+                  </div>
+                ))}
+              </div>
+
+              <Link href="/signup?plan=solo">
+                <Button variant="outline" className="w-full border-primary text-primary hover:bg-primary/10">
+                  Get Solo
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+            </Card>
+          </motion.div>
+
+          {/* ── Business ───────────────────────────────────────────────── */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <Card className="relative h-full border-primary shadow-lg shadow-primary/20 scale-[1.02] p-7 flex flex-col">
+              <div className="absolute top-0 right-0 bg-gradient-to-r from-indigo-500 to-rose-500 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                Most Popular
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold mb-1">{PLANS.business.name}</h3>
+                <p className="text-sm text-muted-foreground">{PLANS.business.description}</p>
+              </div>
+
+              <div className="mb-4">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-sm font-medium text-muted-foreground">QAR</span>
+                  <span className="text-4xl font-bold">{PLANS.business.price}</span>
+                  <span className="text-muted-foreground">/user/month</span>
+                </div>
+              </div>
+
+              {/* Live calculator */}
+              <div className="mb-6 p-4 bg-secondary rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Users className="w-4 h-4" />
+                    <span>{businessUsers} users</span>
+                  </div>
+                  <span className="text-lg font-extrabold text-primary">QAR {businessTotal}/mo</span>
+                </div>
+                <input
+                  type="range"
+                  min={2}
+                  max={100}
+                  value={businessUsers}
+                  onChange={(e) => setBusinessUsers(Number(e.target.value))}
+                  className="w-full accent-primary"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>2</span><span>50</span><span>100</span>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-8 flex-1">
+                {PLANS.business.features.map((f) => (
+                  <div key={f} className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-full bg-green-500/20 p-1 flex-shrink-0">
+                      <Check className="h-3 w-3 text-green-400" />
+                    </div>
+                    <span className="text-sm text-foreground">{f}</span>
+                  </div>
+                ))}
+              </div>
+
+              <Link href="/signup?plan=business">
+                <Button className="w-full bg-gradient-to-r from-indigo-500 to-rose-500 hover:from-indigo-600 hover:to-rose-600">
+                  Get Business
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+            </Card>
           </motion.div>
         </div>
       </section>
 
-      {/* Pricing Cards */}
-      <section className="py-12 px-4">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-          {pricingTiers.map((tier, index) => (
-            <PricingCard key={tier.name} tier={tier} isYearly={isYearly} index={index} />
-          ))}
-        </div>
-      </section>
-
-      {/* FAQ Section */}
+      {/* FAQ */}
       <section className="py-20 px-4">
         <div className="max-w-3xl mx-auto">
           <motion.div
@@ -365,8 +258,8 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 px-4 bg-gradient-to-br from-indigo-50 to-rose-50 dark:from-indigo-950/20 dark:to-rose-950/20">
+      {/* CTA */}
+      <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to get started?</h2>
           <p className="text-lg text-muted-foreground mb-8">
@@ -379,9 +272,9 @@ export default function PricingPage() {
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
-            <Link href="/demo">
+            <Link href="/dashboard/billing">
               <Button size="lg" variant="outline">
-                View Demo
+                View Plans
               </Button>
             </Link>
           </div>

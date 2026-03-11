@@ -127,11 +127,11 @@ function BillingContent() {
               </p>
               {currentTier === 'business' && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  ${PLANS.business.price} × {tenant.userCount} = ${PLANS.business.price * tenant.userCount}/month
+                  QAR {PLANS.business.price} × {tenant.userCount} = QAR {PLANS.business.price * tenant.userCount}/month
                 </p>
               )}
               {currentTier === 'solo' && (
-                <p className="text-sm text-muted-foreground mt-1">${PLANS.solo.price}/month</p>
+                <p className="text-sm text-muted-foreground mt-1">QAR {PLANS.solo.price}/month</p>
               )}
             </div>
             <button
@@ -160,7 +160,7 @@ function BillingContent() {
               <h2 className="text-2xl font-extrabold text-foreground">{PLANS.solo.name}</h2>
               <p className="text-muted-foreground text-sm mt-1">{PLANS.solo.description}</p>
               <div className="mt-4">
-                <span className="text-4xl font-extrabold text-foreground">${PLANS.solo.price}</span>
+                <span className="text-4xl font-extrabold text-foreground">QAR {PLANS.solo.price}</span>
                 <span className="text-muted-foreground text-sm ml-1">/month</span>
               </div>
             </div>
@@ -194,7 +194,7 @@ function BillingContent() {
                     Redirecting…
                   </span>
                 ) : (
-                  `Get Solo — $${PLANS.solo.price}/mo`
+                  `Get Solo — QAR ${PLANS.solo.price}/mo`
                 )}
               </button>
             )}
@@ -220,7 +220,7 @@ function BillingContent() {
               <h2 className="text-2xl font-extrabold text-foreground">{PLANS.business.name}</h2>
               <p className="text-muted-foreground text-sm mt-1">{PLANS.business.description}</p>
               <div className="mt-4 flex items-end gap-1">
-                <span className="text-4xl font-extrabold text-foreground">${PLANS.business.price}</span>
+                <span className="text-4xl font-extrabold text-foreground">QAR {PLANS.business.price}</span>
                 <span className="text-muted-foreground text-sm mb-1">/user/month</span>
               </div>
             </div>
@@ -256,7 +256,7 @@ function BillingContent() {
                 </div>
                 <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Total / month</span>
-                  <span className="text-lg font-extrabold text-foreground">${businessTotal}</span>
+                  <span className="text-lg font-extrabold text-foreground">QAR {businessTotal}</span>
                 </div>
               </div>
             )}
@@ -301,7 +301,7 @@ function BillingContent() {
                     Redirecting…
                   </span>
                 ) : (
-                  `Get Business — $${businessTotal}/mo`
+                  `Get Business — QAR ${businessTotal}/mo`
                 )}
               </button>
             )}
@@ -318,7 +318,7 @@ function BillingContent() {
             },
             {
               q: 'How does Business billing work?',
-              a: `You choose the number of seats and pay $${PLANS.business.price} per user per month. You can add or remove seats at any time via the billing portal.`,
+              a: `You choose the number of seats and pay QAR ${PLANS.business.price} per user per month. You can add or remove seats at any time via the billing portal.`,
             },
             {
               q: 'What happens if I cancel?',
