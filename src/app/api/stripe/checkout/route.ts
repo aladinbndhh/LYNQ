@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
-      currency: 'qar',
+      // currency is derived from the Stripe Price object — set it to QAR when creating prices in Stripe dashboard
       line_items: [
         {
           price: planData.priceId,
