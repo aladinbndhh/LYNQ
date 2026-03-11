@@ -128,7 +128,7 @@ export function ChatWidget({ profileId, greeting, primaryColor = '#3b82f6' }: Ch
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white rounded-lg shadow-2xl flex flex-col z-50">
+    <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-card border border-border rounded-lg shadow-2xl flex flex-col z-50">
       {/* Header */}
       <div
         className="p-4 text-white rounded-t-lg flex justify-between items-center"
@@ -161,7 +161,7 @@ export function ChatWidget({ profileId, greeting, primaryColor = '#3b82f6' }: Ch
               className={`max-w-[80%] p-3 rounded-lg ${
                 message.role === 'user'
                   ? 'text-white'
-                  : 'bg-gray-100 text-gray-900'
+                  : 'bg-secondary text-foreground'
               }`}
               style={
                 message.role === 'user'
@@ -175,11 +175,11 @@ export function ChatWidget({ profileId, greeting, primaryColor = '#3b82f6' }: Ch
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 p-3 rounded-lg">
+            <div className="bg-secondary p-3 rounded-lg">
               <div className="flex gap-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           </div>
@@ -197,13 +197,13 @@ export function ChatWidget({ profileId, greeting, primaryColor = '#3b82f6' }: Ch
             onKeyPress={handleKeyPress}
             placeholder="Type your message..."
             disabled={loading}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 disabled:bg-gray-100"
+            className="flex-1 px-4 py-2 border border-border bg-background text-foreground placeholder:text-muted-foreground rounded-lg focus:outline-none focus:ring-2 disabled:opacity-50"
             style={{ '--tw-ring-color': primaryColor } as any}
           />
           <button
             onClick={sendMessage}
             disabled={loading || !input.trim()}
-            className="px-4 py-2 text-white rounded-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 text-white rounded-lg font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             style={{ backgroundColor: loading || !input.trim() ? undefined : primaryColor }}
           >
             Send

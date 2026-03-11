@@ -32,20 +32,20 @@ export default function EmailSignaturePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">Loading…</div>
       </div>
     );
   }
 
   if (!selectedProfile) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <nav className="bg-white shadow-sm border-b">
+      <div className="min-h-screen bg-background">
+        <nav className="bg-card border-b border-border">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-16">
               <div className="flex items-center gap-8">
-                <Link href="/dashboard" className="text-2xl font-bold text-blue-600">
+                <Link href="/dashboard" className="text-2xl font-bold bg-gradient-to-r from-indigo-500 to-rose-500 bg-clip-text text-transparent">
                   LynQ
                 </Link>
               </div>
@@ -55,13 +55,13 @@ export default function EmailSignaturePage() {
 
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
           <div className="text-6xl mb-4">📧</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">No Profiles Yet</h2>
-          <p className="text-gray-600 mb-6">
+          <h2 className="text-2xl font-bold text-foreground mb-2">No Profiles Yet</h2>
+          <p className="text-muted-foreground mb-6">
             Create a profile first to generate your email signature
           </p>
           <Link
             href="/dashboard/profiles/new"
-            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            className="inline-block px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold"
           >
             Create Profile
           </Link>
@@ -71,15 +71,15 @@ export default function EmailSignaturePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b">
+    <div className="min-h-screen bg-background">
+      <nav className="bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center gap-8">
-              <Link href="/dashboard" className="text-2xl font-bold text-blue-600">
+              <Link href="/dashboard" className="text-2xl font-bold bg-gradient-to-r from-indigo-500 to-rose-500 bg-clip-text text-transparent">
                 LynQ
               </Link>
-              <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
+              <Link href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
                 Dashboard
               </Link>
             </div>
@@ -89,27 +89,27 @@ export default function EmailSignaturePage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Email Signature Generator</h2>
-          <p className="text-gray-600">
+          <h2 className="text-3xl font-bold text-foreground mb-2">Email Signature Generator</h2>
+          <p className="text-muted-foreground">
             Generate a professional email signature with your company logo badge
           </p>
         </div>
 
         {/* Profile Selector */}
         {profiles.length > 1 && (
-          <div className="mb-6 bg-white rounded-lg shadow p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="mb-6 bg-card rounded-xl border border-border p-4">
+            <label className="block text-sm font-medium text-foreground/80 mb-2">
               Select Profile:
             </label>
             <select
               value={selectedProfile?.id?.toString() || selectedProfile?._id?.toString() || ''}
               onChange={(e) => {
-                const profile = profiles.find((p) => 
+                const profile = profiles.find((p) =>
                   p.id?.toString() === e.target.value || p._id?.toString() === e.target.value
                 );
                 setSelectedProfile(profile || null);
               }}
-              className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full max-w-md px-4 py-2 border border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
             >
               {profiles.map((profile) => {
                 const profileId = profile.id?.toString() || profile._id?.toString() || '';

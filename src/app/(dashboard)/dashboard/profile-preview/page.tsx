@@ -7,7 +7,6 @@ import { EmailSignatureTemplate } from '@/components/email-signature/template';
 export default function ProfilePreviewPage() {
   const [activeTab, setActiveTab] = useState<'card' | 'signature'>('card');
 
-  // Sample data - in production, this would come from the profile
   const profileData = {
     name: 'Sarah Anderson',
     title: 'Senior Product Designer',
@@ -26,14 +25,13 @@ export default function ProfilePreviewPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b">
+    <div className="min-h-screen bg-background">
+      <nav className="bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center gap-8">
-              <h1 className="text-2xl font-bold text-blue-600">LynQ</h1>
-              <a href="/dashboard" className="text-gray-600 hover:text-gray-900">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-500 to-rose-500 bg-clip-text text-transparent">LynQ</h1>
+              <a href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
                 ← Back to Dashboard
               </a>
             </div>
@@ -43,18 +41,18 @@ export default function ProfilePreviewPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Profile Assets</h2>
-          <p className="text-gray-600">Preview and download your profile card and email signature</p>
+          <h2 className="text-3xl font-bold text-foreground mb-2">Profile Assets</h2>
+          <p className="text-muted-foreground">Preview and download your profile card and email signature</p>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-4 mb-8 border-b border-gray-200">
+        <div className="flex gap-4 mb-8 border-b border-border">
           <button
             onClick={() => setActiveTab('card')}
             className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
               activeTab === 'card'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             Digital Business Card
@@ -63,8 +61,8 @@ export default function ProfilePreviewPage() {
             onClick={() => setActiveTab('signature')}
             className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
               activeTab === 'signature'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             Email Signature
@@ -72,20 +70,20 @@ export default function ProfilePreviewPage() {
         </div>
 
         {/* Content */}
-        <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="bg-card rounded-xl border border-border p-8">
           {activeTab === 'card' && (
             <div className="space-y-6">
               <div className="text-center mb-8">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <h3 className="text-xl font-semibold text-foreground mb-2">
                   Digital Business Card
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-muted-foreground">
                   This is how your profile appears to visitors
                 </p>
               </div>
               <EnhancedProfileCard {...profileData} />
               <div className="text-center mt-8">
-                <p className="text-sm text-gray-500 mb-4">
+                <p className="text-sm text-muted-foreground mb-4">
                   Notice the company logo appears as a small badge on your profile picture
                 </p>
               </div>
@@ -100,16 +98,16 @@ export default function ProfilePreviewPage() {
         </div>
 
         {/* Feature Highlight */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <div className="mt-8 bg-primary/10 border border-primary/20 rounded-lg p-6">
           <div className="flex items-start gap-4">
             <div className="text-3xl">✨</div>
             <div>
-              <h3 className="font-semibold text-blue-900 mb-2">
+              <h3 className="font-semibold text-foreground mb-2">
                 Company Logo Badge Feature
               </h3>
-              <p className="text-sm text-blue-800">
-                Your company logo now appears as a small circular badge beside your profile picture in both 
-                your digital business card and email signature. This helps reinforce your company branding 
+              <p className="text-sm text-muted-foreground">
+                Your company logo now appears as a small circular badge beside your profile picture in both
+                your digital business card and email signature. This helps reinforce your company branding
                 and makes your profile more professional and recognizable.
               </p>
             </div>

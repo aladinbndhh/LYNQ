@@ -1,6 +1,5 @@
 import QRCode from 'qrcode';
-import { Types } from 'mongoose';
-import { Profile, Tenant } from '@/lib/db/models';
+import { Profile } from '@/lib/db/models';
 import { IProfile } from '@/types';
 import { TenantContext } from '@/lib/middleware/tenant';
 
@@ -12,23 +11,17 @@ export class ProfileService {
     data: Partial<IProfile>,
     tenantContext: TenantContext
   ): Promise<IProfile> {
-    // Check if username is already taken
     const existing = await Profile.findOne({ username: data.username });
     if (existing) {
       throw new Error('Username already taken');
     }
 
-    // Get tenant's Odoo URL for QR code
-    const tenant = await Tenant.findById(tenantContext.tenantId);
-    const odooUrl = tenant?.odooConfig?.url || process.env.ODOO_URL || 'http://localhost:8069';
-    
-    // Generate QR code - link to Odoo contact page for lead capture
-    const contactUrl = `${odooUrl}/lynq/contact/${data.username}`;
-    const qrCode = await this.generateQRCode(contactUrl);
+    const qrCode = await this.generateQRCode(data.username!);
 
     const profile = await Profile.create({
       ...data,
       tenantId: tenantContext.tenantId,
+      userId: tenantContext.user.id,
       qrCode,
     });
 
@@ -70,7 +63,6 @@ export class ProfileService {
     data: Partial<IProfile>,
     tenantContext: TenantContext
   ): Promise<IProfile | null> {
-    // If username is being changed, check if it's available
     if (data.username) {
       const existing = await Profile.findOne({
         username: data.username,
@@ -79,14 +71,7 @@ export class ProfileService {
       if (existing) {
         throw new Error('Username already taken');
       }
-
-      // Get tenant's Odoo URL for QR code
-      const tenant = await Tenant.findById(tenantContext.tenantId);
-      const odooUrl = tenant?.odooConfig?.url || process.env.ODOO_URL || 'http://localhost:8069';
-      
-      // Regenerate QR code with new username - link to Odoo contact page
-      const contactUrl = `${odooUrl}/lynq/contact/${data.username}`;
-      data.qrCode = await this.generateQRCode(contactUrl);
+      data.qrCode = await this.generateQRCode(data.username);
     }
 
     return Profile.findOneAndUpdate(
@@ -114,11 +99,13 @@ export class ProfileService {
   }
 
   /**
-   * Generate QR code as data URL
+   * Generate QR code pointing to the Next.js public card page
    */
-  static async generateQRCode(url: string): Promise<string> {
+  static async generateQRCode(username: string): Promise<string> {
     try {
-      const qrCodeDataUrl = await QRCode.toDataURL(url, {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const contactUrl = `${appUrl}/${username}`;
+      const qrCodeDataUrl = await QRCode.toDataURL(contactUrl, {
         width: 400,
         margin: 2,
         color: {

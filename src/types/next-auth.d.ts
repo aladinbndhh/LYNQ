@@ -10,7 +10,6 @@ declare module 'next-auth' {
       tenantId: string;
       role: 'admin' | 'user';
       image?: string | null;
-      odooUserId?: number;
     };
   }
 
@@ -20,7 +19,7 @@ declare module 'next-auth' {
     name: string;
     tenantId: string;
     role: 'admin' | 'user';
-    odooUserId?: number;
+    image?: string | null;
   }
 }
 
@@ -31,7 +30,6 @@ declare module 'next-auth/jwt' {
     name: string;
     tenantId: string;
     role: 'admin' | 'user';
-    odooUserId?: number;
-    odooPassword?: string; // For API calls (in production, use OAuth tokens)
+    picture?: string;
   }
 }

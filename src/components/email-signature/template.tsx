@@ -2,6 +2,8 @@
 
 import * as React from 'react';
 
+export type SignatureTemplate = 'classic' | 'modern' | 'minimal' | 'branded';
+
 interface EmailSignatureProps {
   name: string;
   title: string;
@@ -15,337 +17,355 @@ interface EmailSignatureProps {
   companyLogo?: string;
   qrCode?: string;
   primaryColor?: string;
+  template?: SignatureTemplate;
+  showQr?: boolean;
+  showSocials?: boolean;
+  showAvatar?: boolean;
 }
 
-export function EmailSignatureTemplate({
-  name,
-  title,
-  company,
-  email,
-  phone,
-  website,
-  linkedin,
-  twitter,
-  avatar,
-  companyLogo,
-  qrCode,
-  primaryColor = '#3b82f6',
-}: EmailSignatureProps) {
-  const [copied, setCopied] = React.useState(false);
+function buildHtml(p: EmailSignatureProps): string {
+  const color = p.primaryColor || '#3b82f6';
+  const appUrl = (typeof window !== 'undefined' ? window.location.origin : '') || 'https://app.lynq.io';
+  const cardUrl = p.website || appUrl;
+  const tpl = p.template || 'classic';
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  const avatarHtml = p.showAvatar !== false && p.avatar
+    ? `<img src="${p.avatar}" alt="${p.name}" width="80" height="80" style="width:80px;height:80px;border-radius:50%;object-fit:cover;display:block;">`
+    : p.showAvatar !== false
+      ? `<div style="width:80px;height:80px;border-radius:50%;background-color:${color};display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;font-weight:700;font-family:Arial,sans-serif;">${p.name.charAt(0).toUpperCase()}</div>`
+      : '';
 
-  const generateHTMLSignature = () => {
-    // Get Odoo URL from environment (should be set to actual Odoo instance)
-    const odooUrl = process.env.NEXT_PUBLIC_ODOO_URL || process.env.ODOO_URL || 'https://aladinbndhh-lynq-test-live-29061122.dev.odoo.com';
-    
-    // Ensure avatar and logo use Odoo URLs (absolute URLs)
-    const avatarUrl = avatar 
-      ? (avatar.startsWith('http') ? avatar : `${odooUrl}${avatar.startsWith('/') ? '' : '/'}${avatar}`)
-      : null;
-    // Always set logo URL if company exists - construct from profile ID if available
-    // Note: This component doesn't have profile ID, so we rely on companyLogo prop
-    const logoUrl = company && companyLogo
-      ? (companyLogo.startsWith('http') ? companyLogo : `${odooUrl}${companyLogo.startsWith('/') ? '' : '/'}${companyLogo}`)
-      : null;
-    const qrCodeUrl = qrCode
-      ? (qrCode.startsWith('http') ? qrCode : `${odooUrl}${qrCode.startsWith('/') ? '' : '/'}${qrCode}`)
-      : null;
+  const logoHtml = p.companyLogo
+    ? `<img src="${p.companyLogo}" alt="${p.company}" width="24" height="24" style="width:24px;height:24px;border-radius:50%;object-fit:contain;border:2px solid #fff;">`
+    : '';
 
-    // Build contact icons HTML
-    const contactIcons = [];
-    if (phone) {
-      contactIcons.push(`<td style="padding:2px 6px 0px 0px;display:table-cell;"><a href="tel:${phone}" style="display:inline-block;width:20px;height:20px;"><img alt="Phone number" width="20" height="20" src="https://dash.popl.co/assets/img/new-links/call.png" style="width:20px;height:20px;border:0px;border-radius:4px;"></a></td>`);
-    }
-    if (email) {
-      contactIcons.push(`<td style="padding:2px 6px 0px 0px;display:table-cell;"><a href="mailto:${email}" style="display:inline-block;width:20px;height:20px;"><img alt="email icon for mail" width="20" height="20" src="https://dash.popl.co/assets/img/new-links/email.png" style="width:20px;height:20px;border:0px;border-radius:4px;"></a></td>`);
-    }
-    if (website) {
-      contactIcons.push(`<td style="padding:2px 6px 0px 0px;display:table-cell;"><a href="${website}" style="display:inline-block;width:20px;height:20px;"><img alt="maps logo" width="20" height="20" src="https://dash.popl.co/assets/img/new-links/address.png" style="width:20px;height:20px;border:0px;border-radius:4px;"></a></td>`);
-      contactIcons.push(`<td style="padding:2px 6px 0px 0px;display:table-cell;"><a href="${website}" style="display:inline-block;width:20px;height:20px;"><img alt="website logo in blue" width="20" height="20" src="https://dash.popl.co/assets/img/new-links/website.png" style="width:20px;height:20px;border:0px;border-radius:4px;"></a></td>`);
-    }
+  const socialIcons: string[] = [];
+  if (p.showSocials !== false) {
+    if (p.phone) socialIcons.push(`<a href="tel:${p.phone}" style="margin-right:6px;"><img src="https://dash.popl.co/assets/img/new-links/call.png" width="20" height="20" style="border-radius:4px;"></a>`);
+    if (p.email) socialIcons.push(`<a href="mailto:${p.email}" style="margin-right:6px;"><img src="https://dash.popl.co/assets/img/new-links/email.png" width="20" height="20" style="border-radius:4px;"></a>`);
+    if (p.linkedin) socialIcons.push(`<a href="${p.linkedin}" style="margin-right:6px;"><img src="https://img.icons8.com/color/20/000000/linkedin.png" width="20" height="20" style="border-radius:4px;"></a>`);
+    if (p.twitter) socialIcons.push(`<a href="${p.twitter}" style="margin-right:6px;"><img src="https://img.icons8.com/color/20/000000/twitter--v1.png" width="20" height="20" style="border-radius:4px;"></a>`);
+  }
 
-    return `
-<table cellpadding="0" cellspacing="0" border="0" id="copy-signature" style="position:static;z-index:-1000;top:0px;width:460px;left:0px;border:1.3px solid rgb(242,242,242);box-sizing:border-box;border-radius:0px;box-shadow:none;font-family:Arial,sans-serif;">
+  const qrSection = p.showQr !== false && p.qrCode
+    ? `<td align="center" style="padding:16px 0 16px 24px;vertical-align:top;">
+        <div style="text-align:center;">
+          <img src="${p.qrCode}" alt="QR Code" width="120" height="120" style="width:120px;height:120px;display:block;border-radius:8px;border:1px solid #e2e8f0;">
+          <a href="${cardUrl}" style="font-size:11px;color:${color};text-decoration:none;display:block;margin-top:6px;">My Digital Card</a>
+        </div>
+      </td>`
+    : '';
+
+  if (tpl === 'minimal') {
+    return `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif;font-size:13px;color:#374151;max-width:400px;">
+  <tbody>
+    <tr><td style="padding-bottom:2px;font-size:15px;font-weight:700;color:#111827;">${p.name}</td></tr>
+    <tr><td style="color:#6b7280;">${p.title}${p.company ? ` · ${p.company}` : ''}</td></tr>
+    <tr><td style="padding-top:8px;">
+      ${p.phone ? `<a href="tel:${p.phone}" style="color:#6b7280;text-decoration:none;margin-right:12px;">📱 ${p.phone}</a>` : ''}
+      ${p.email ? `<a href="mailto:${p.email}" style="color:#6b7280;text-decoration:none;margin-right:12px;">✉️ ${p.email}</a>` : ''}
+    </td></tr>
+    ${p.linkedin || p.twitter ? `<tr><td style="padding-top:6px;">${socialIcons.join('')}</td></tr>` : ''}
+    <tr><td style="padding-top:8px;border-top:2px solid ${color};font-size:11px;color:#9ca3af;">
+      <a href="${cardUrl}" style="color:${color};text-decoration:none;">View Digital Card →</a>
+    </td></tr>
+  </tbody>
+</table>`;
+  }
+
+  if (tpl === 'modern') {
+    return `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif;max-width:480px;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
   <tbody>
     <tr>
-      <td style="width:210px;padding:20px 0px 0px 20px;">
-        <table id="leftSideTable" style="max-width:210px;width:100%;">
-          <tbody>
-            <tr>
-              <td>
-                <table>
-                  <tbody>
-                    <tr>
-                      <td style="padding:0px;display:table-cell;line-height:1.2 !important;">
-                        <table style="border-spacing:0;border-collapse:collapse;">
-                          <tbody>
-                            <tr>
-                              <td style="padding:0px;vertical-align:middle;">
-                                ${avatarUrl ? `
-                                <img alt="" id="profile-pic-target" width="120" src="${avatarUrl}" style="width:120px;height:120px;border-radius:50%;display:block;">
-                                ` : `
-                                <div style="width:120px;height:120px;border-radius:50%;background-color:#2563eb;display:flex;align-items:center;justify-content:center;color:white;font-size:48px;font-weight:bold;font-family:Arial,sans-serif;">
-                                  ${getInitials(name)}
-                                </div>
-                                `}
-                              </td>
-                              ${company ? `
-                              <td style="padding:0px 0px 0px 10px;vertical-align:middle;">
-                                <div style="width:48px;height:48px;border-radius:50%;background-color:#ffffff;border:2px solid #ffffff;padding:2px;box-shadow:0 2px 4px rgba(0,0,0,0.1);position:relative;">
-                                  ${logoUrl ? `
-                                  <img src="${logoUrl}" alt="${company || ''}" style="width:100%;height:100%;border-radius:50%;object-fit:contain;display:block;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                  <div style="width:100%;height:100%;border-radius:50%;background-color:#f3f4f6;display:none;align-items:center;justify-content:center;color:#6b7280;font-size:14px;font-weight:600;font-family:Arial,sans-serif;position:absolute;top:0;left:0;">
-                                    ${company.charAt(0).toUpperCase()}
-                                  </div>
-                                  ` : `
-                                  <div style="width:100%;height:100%;border-radius:50%;background-color:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:14px;font-weight:600;font-family:Arial,sans-serif;">
-                                    ${company.charAt(0).toUpperCase()}
-                                  </div>
-                                  `}
-                                </div>
-                              </td>
-                              ` : ''}
-                            </tr>
-                          </tbody>
-                        </table>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </td>
-            </tr>
-            <tr style="padding:0px;margin:0px;">
-              <td style="font-size:18px;font-weight:600;padding:0px;margin:0px;line-height:1.2 !important;">
-                <table style="border-spacing:0px;border-collapse:collapse;">
-                  <tbody>
-                    <tr>
-                      <td id="signature-fullname" colspan="2" style="font-size:18px;margin:0px;font-weight:600;text-overflow:ellipsis;display:block;white-space:nowrap;padding:0px;overflow:hidden;font-family:Arial,sans-serif;">${name}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td style="font-size:12px;font-weight:400;color:rgb(79,79,79);padding:0px;line-height:15px !important;">
-                <span style="font-size:12px;font-weight:400;color:rgb(79,79,79);line-height:15px;font-family:Arial,sans-serif;">${title || ''}</span>
-              </td>
-            </tr>
-            <tr>
-              <td style="font-size:12px;font-weight:400;color:rgb(79,79,79);padding:0px;line-height:15px !important;">
-                <span style="font-size:12px;font-weight:400;color:rgb(79,79,79);line-height:15px;font-family:Arial,sans-serif;">${company || ''}</span>
-              </td>
-            </tr>
-            ${phone ? `
-            <tr>
-              <td style="font-size:12px;font-weight:400;color:rgb(130,130,130);padding:0px;height:16px;line-height:15px !important;">
-                <span style="font-family:Arial,sans-serif;">${phone}</span>
-              </td>
-            </tr>
-            ` : ''}
-            <tr>
-              <td colspan="2" style="padding-top:8px;padding-bottom:20px;min-width:166px;vertical-align:middle;height:20px;">
-                <table style="border-collapse:collapse;">
-                  <tbody>
-                    <tr>
-                      ${contactIcons.join('')}
-                    </tr>
-                  </tbody>
-                </table>
-              </td>
-            </tr>
-          </tbody>
+      <td style="background:${color};padding:16px 20px;">
+        <table cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+          <tr>
+            <td style="vertical-align:middle;">
+              ${avatarHtml ? `<div style="display:inline-block;vertical-align:middle;margin-right:12px;">${avatarHtml}</div>` : ''}
+              <div style="display:inline-block;vertical-align:middle;">
+                <div style="font-size:18px;font-weight:700;color:#fff;">${p.name}</div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.85);">${p.title}${p.company ? ` — ${p.company}` : ''}</div>
+              </div>
+            </td>
+            ${qrSection ? `<td style="text-align:right;vertical-align:middle;">${p.qrCode ? `<img src="${p.qrCode}" width="64" height="64" style="border-radius:6px;">` : ''}</td>` : ''}
+          </tr>
         </table>
       </td>
-      <td style="padding:0px;line-height:1.2 !important;"></td>
-      <td align="center" style="padding:20px 20px 0px 40px;vertical-align:top;">
-        <table style="width:180px;">
-          <tbody>
-            <tr>
-              <td style="text-align:center;padding-bottom:8px;padding-top:5px;">
-                <span style="font-size:12px;font-weight:500;color:rgb(130,130,130);display:block;font-family:Arial,sans-serif;">Connect with me</span>
-              </td>
-            </tr>
-            <tr>
-              <td style="text-align:center;margin:0px auto;height:190px;vertical-align:middle;line-height:1.2 !important;">
-                ${qrCodeUrl ? `
-                <img width="172" height="190" id="qrcodeWithLogo" alt="qrcodeWithLogo" src="${qrCodeUrl}" style="width:172px;height:190px;display:block;margin:0 auto;">
-                ` : `
-                <div style="width:172px;height:190px;background-color:#f9fafb;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-family:Arial,sans-serif;font-size:11px;margin:0 auto;">
-                  QR Code
-                </div>
-                `}
-              </td>
-            </tr>
-            <tr>
-              <td id="digital-card" colspan="1" style="max-width:96px;text-align:center;padding-top:8px;padding-bottom:20px;">
-                <a href="${website || '#'}" target="_blank" rel="noreferrer" style="font-size:12px;text-align:center;text-decoration:none;font-weight:400;color:rgb(41,174,248);display:block;">My Digital Business Card</a>
-              </td>
-            </tr>
-          </tbody>
+    </tr>
+    <tr>
+      <td style="padding:16px 20px;background:#fff;">
+        <table cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            ${p.phone ? `<td style="padding-right:16px;font-size:13px;color:#374151;">📱 <a href="tel:${p.phone}" style="color:#374151;text-decoration:none;">${p.phone}</a></td>` : ''}
+            ${p.email ? `<td style="padding-right:16px;font-size:13px;color:#374151;">✉️ <a href="mailto:${p.email}" style="color:#374151;text-decoration:none;">${p.email}</a></td>` : ''}
+          </tr>
+          ${socialIcons.length ? `<tr><td colspan="2" style="padding-top:10px;">${socialIcons.join('')}</td></tr>` : ''}
         </table>
       </td>
     </tr>
   </tbody>
-</table>
-    `.trim();
+</table>`;
+  }
+
+  if (tpl === 'branded') {
+    return `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif;max-width:480px;border-left:4px solid ${color};">
+  <tbody>
+    <tr>
+      <td style="padding:16px 20px;">
+        <table cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+          <tr>
+            <td style="vertical-align:top;padding-right:16px;">
+              ${avatarHtml ? `<div style="position:relative;display:inline-block;">${avatarHtml}${logoHtml ? `<div style="position:absolute;bottom:0;right:0;">${logoHtml}</div>` : ''}</div>` : ''}
+            </td>
+            <td style="vertical-align:top;flex:1;">
+              <div style="font-size:17px;font-weight:700;color:#111827;">${p.name}</div>
+              <div style="font-size:13px;color:#6b7280;margin-top:2px;">${p.title}</div>
+              <div style="font-size:13px;font-weight:600;color:${color};margin-top:2px;">${p.company}</div>
+              <div style="margin-top:10px;">
+                ${p.phone ? `<div style="font-size:12px;color:#6b7280;margin-bottom:3px;">📱 <a href="tel:${p.phone}" style="color:#6b7280;text-decoration:none;">${p.phone}</a></div>` : ''}
+                ${p.email ? `<div style="font-size:12px;color:#6b7280;margin-bottom:3px;">✉️ <a href="mailto:${p.email}" style="color:#6b7280;text-decoration:none;">${p.email}</a></div>` : ''}
+                ${p.website ? `<div style="font-size:12px;color:#6b7280;margin-bottom:3px;">🌐 <a href="${p.website}" style="color:${color};text-decoration:none;">${p.website}</a></div>` : ''}
+              </div>
+              ${socialIcons.length ? `<div style="margin-top:10px;">${socialIcons.join('')}</div>` : ''}
+            </td>
+            ${qrSection}
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </tbody>
+</table>`;
+  }
+
+  // Classic (default)
+  return `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif;width:460px;border:1.3px solid #f2f2f2;box-sizing:border-box;">
+  <tbody>
+    <tr>
+      <td style="width:220px;padding:20px 0 0 20px;vertical-align:top;">
+        <table cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+          <tr>
+            <td style="padding-bottom:12px;">
+              ${avatarHtml ? `<div style="position:relative;display:inline-block;">${avatarHtml}${logoHtml ? `<div style="position:absolute;bottom:-2px;right:-2px;">${logoHtml}</div>` : ''}</div>` : ''}
+            </td>
+          </tr>
+          <tr><td style="font-size:17px;font-weight:700;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;">${p.name}</td></tr>
+          <tr><td style="font-size:12px;color:#4f4f4f;padding-top:2px;">${p.title || ''}</td></tr>
+          <tr><td style="font-size:12px;color:#4f4f4f;">${p.company || ''}</td></tr>
+          ${p.phone ? `<tr><td style="font-size:12px;color:#828282;padding-top:4px;">${p.phone}</td></tr>` : ''}
+          <tr><td style="padding-top:10px;padding-bottom:20px;">${socialIcons.join('')}</td></tr>
+        </table>
+      </td>
+      <td style="width:1px;background:#f2f2f2;"></td>
+      <td align="center" style="padding:20px 20px 0 24px;vertical-align:top;">
+        ${p.showQr !== false && p.qrCode ? `<div style="text-align:center;">
+          <div style="font-size:11px;color:#828282;margin-bottom:6px;">Connect with me</div>
+          <img src="${p.qrCode}" width="140" height="140" style="display:block;border-radius:8px;border:1px solid #e2e8f0;">
+          <a href="${cardUrl}" style="font-size:11px;color:${color};text-decoration:none;display:block;margin-top:8px;margin-bottom:20px;">My Digital Business Card</a>
+        </div>` : `<div style="padding:20px;text-align:center;">
+          <a href="${cardUrl}" style="font-size:13px;color:${color};text-decoration:none;font-weight:600;">View My Card →</a>
+        </div>`}
+      </td>
+    </tr>
+  </tbody>
+</table>`;
+}
+
+export function EmailSignatureTemplate(props: EmailSignatureProps) {
+  const [template, setTemplate] = React.useState<SignatureTemplate>(props.template || 'classic');
+  const [primaryColor, setPrimaryColor] = React.useState(props.primaryColor || '#3b82f6');
+  const [showQr, setShowQr] = React.useState(props.showQr !== false);
+  const [showSocials, setShowSocials] = React.useState(props.showSocials !== false);
+  const [showAvatar, setShowAvatar] = React.useState(props.showAvatar !== false);
+  const [copied, setCopied] = React.useState(false);
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+
+  const currentProps: EmailSignatureProps = {
+    ...props,
+    template,
+    primaryColor,
+    showQr,
+    showSocials,
+    showAvatar,
   };
 
-  const copyToClipboard = () => {
-    const html = generateHTMLSignature();
-    
-    // Create a temporary element to hold the HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = html;
-    document.body.appendChild(tempDiv);
+  const html = buildHtml(currentProps);
 
-    // Copy to clipboard
-    const range = document.createRange();
-    range.selectNodeContents(tempDiv);
-    const selection = window.getSelection();
-    if (selection) {
-      selection.removeAllRanges();
-      selection.addRange(range);
-      document.execCommand('copy');
-      selection.removeAllRanges();
+  // Update iframe preview
+  React.useEffect(() => {
+    if (iframeRef.current) {
+      const doc = iframeRef.current.contentDocument;
+      if (doc) {
+        doc.open();
+        doc.write(`<!DOCTYPE html><html><body style="margin:16px;font-family:Arial,sans-serif;">${html}</body></html>`);
+        doc.close();
+      }
     }
+  }, [html]);
 
-    document.body.removeChild(tempDiv);
-
-    setCopied(true);
-    setTimeout(() => setCopied(false), 3000);
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([html], { type: 'text/plain' }),
+        }),
+      ]);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      // Fallback
+      const el = document.createElement('div');
+      el.innerHTML = html;
+      document.body.appendChild(el);
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      if (sel) { sel.removeAllRanges(); sel.addRange(range); document.execCommand('copy'); sel.removeAllRanges(); }
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    }
   };
+
+  const templates: { id: SignatureTemplate; label: string }[] = [
+    { id: 'classic', label: 'Classic' },
+    { id: 'modern', label: 'Modern' },
+    { id: 'minimal', label: 'Minimal' },
+    { id: 'branded', label: 'Branded' },
+  ];
+
+  const presetColors = ['#3b82f6', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#ef4444', '#14b8a6', '#1e293b'];
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-foreground mb-2">Email Signature</h2>
-        <p className="text-sm text-muted-foreground">
-          Copy and paste this signature into your email client
-        </p>
+    <div className="w-full max-w-5xl mx-auto space-y-6">
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold text-foreground mb-1">Email Signature Builder</h2>
+        <p className="text-sm text-muted-foreground">Customize and copy your professional signature</p>
       </div>
 
-      {/* Preview */}
-      <div className="border border-border rounded-lg p-8 bg-background">
-        <div className="max-w-2xl">
-          <div className="flex items-start gap-6">
-            {/* Avatar with Company Logo */}
-            <div className="relative flex-shrink-0">
-              {avatar ? (
-                <img
-                  src={avatar}
-                  alt={name}
-                  className="w-[70px] h-[70px] rounded-full object-cover"
-                  style={{ border: `2px solid ${primaryColor}` }}
-                />
-              ) : (
-                <div
-                  className="w-[70px] h-[70px] rounded-full flex items-center justify-center text-white text-2xl font-bold"
-                  style={{ backgroundColor: primaryColor }}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Controls */}
+        <div className="space-y-5">
+          {/* Template picker */}
+          <div className="bg-card border border-border rounded-xl p-4">
+            <p className="text-sm font-semibold text-foreground mb-3">Template</p>
+            <div className="grid grid-cols-2 gap-2">
+              {templates.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTemplate(t.id)}
+                  className={`py-2 px-3 rounded-lg text-sm font-medium border-2 transition-colors ${
+                    template === t.id
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-border text-muted-foreground hover:border-blue-200'
+                  }`}
                 >
-                  {getInitials(name)}
-                </div>
-              )}
-
-              {companyLogo && (
-                <img
-                  src={companyLogo}
-                  alt={company}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white border-2 border-white p-0.5 object-contain"
-                />
-              )}
+                  {t.label}
+                </button>
+              ))}
             </div>
-
-            {/* Contact Info */}
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-foreground">{name}</h3>
-              <p className="text-sm text-muted-foreground">{title}</p>
-              <p className="text-sm font-medium mb-3" style={{ color: primaryColor }}>
-                {company}
-              </p>
-
-              <div className="space-y-1 text-sm text-muted-foreground">
-                {email && <div>📧 {email}</div>}
-                {phone && <div>📱 {phone}</div>}
-                {website && <div>🌐 {website}</div>}
-              </div>
-
-              {(linkedin || twitter) && (
-                <div className="flex items-center gap-2 mt-3">
-                  {linkedin && (
-                    <a href={linkedin} target="_blank" rel="noopener noreferrer">
-                      <img
-                        src="https://img.icons8.com/color/32/000000/linkedin.png"
-                        alt="LinkedIn"
-                        className="w-5 h-5"
-                      />
-                    </a>
-                  )}
-                  {twitter && (
-                    <a href={twitter} target="_blank" rel="noopener noreferrer">
-                      <img
-                        src="https://img.icons8.com/color/32/000000/twitter.png"
-                        alt="Twitter"
-                        className="w-5 h-5"
-                      />
-                    </a>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* QR Code */}
-            {qrCode && (
-              <div className="flex-shrink-0 text-center">
-                <img
-                  src={qrCode}
-                  alt="Scan to connect"
-                  className="w-[100px] h-[100px] border border-border rounded-lg p-1 bg-white"
-                />
-                <p className="text-[10px] text-muted-foreground mt-1">Scan to connect</p>
-              </div>
-            )}
           </div>
 
-          <div className="h-px bg-border my-4" />
+          {/* Color picker */}
+          <div className="bg-card border border-border rounded-xl p-4">
+            <p className="text-sm font-semibold text-foreground mb-3">Brand Color</p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {presetColors.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setPrimaryColor(c)}
+                  className="w-7 h-7 rounded-full border-2 transition-transform hover:scale-110"
+                  style={{
+                    background: c,
+                    borderColor: primaryColor === c ? '#fff' : 'transparent',
+                    boxShadow: primaryColor === c ? `0 0 0 2px ${c}` : 'none',
+                  }}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={primaryColor}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                className="w-8 h-8 rounded cursor-pointer border-0 p-0"
+              />
+              <input
+                type="text"
+                value={primaryColor}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                className="flex-1 text-sm border border-border rounded-lg px-2 py-1 font-mono"
+              />
+            </div>
+          </div>
 
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Powered by</span>
-            <span className="font-semibold" style={{ color: primaryColor }}>
-              LynQ
-            </span>
+          {/* Toggles */}
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <p className="text-sm font-semibold text-foreground">Show Elements</p>
+            {[
+              { label: 'Profile photo', value: showAvatar, setter: setShowAvatar },
+              { label: 'QR code', value: showQr, setter: setShowQr },
+              { label: 'Social icons', value: showSocials, setter: setShowSocials },
+            ].map(({ label, value, setter }) => (
+              <label key={label} className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm text-muted-foreground">{label}</span>
+                <div
+                  onClick={() => setter(!value)}
+                  className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${value ? 'bg-blue-500' : 'bg-gray-200'}`}
+                >
+                  <div
+                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'}`}
+                  />
+                </div>
+              </label>
+            ))}
+          </div>
+
+          {/* Install guides */}
+          <div className="bg-muted/50 border border-border rounded-xl p-4">
+            <p className="text-sm font-semibold text-foreground mb-2">How to install</p>
+            <ol className="space-y-1.5 text-xs text-muted-foreground">
+              <li>1. Click <strong>Copy Signature</strong> below</li>
+              <li>2. <strong>Gmail:</strong> Settings → See all settings → Signature → Paste</li>
+              <li>3. <strong>Outlook:</strong> File → Options → Mail → Signatures → Paste</li>
+              <li>4. <strong>Apple Mail:</strong> Mail → Preferences → Signatures → Paste</li>
+            </ol>
           </div>
         </div>
-      </div>
 
-      {/* Copy Button */}
-      <div className="flex justify-center">
-        <button
-          onClick={copyToClipboard}
-          className="px-6 py-3 rounded-lg font-semibold text-white transition-colors"
-          style={{ backgroundColor: primaryColor }}
-        >
-          {copied ? '✓ Copied to Clipboard!' : 'Copy Email Signature'}
-        </button>
-      </div>
+        {/* Live preview (2/3 width) */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="px-4 py-2 border-b border-border bg-muted/30 text-xs text-muted-foreground font-medium">
+              Live Preview
+            </div>
+            <iframe
+              ref={iframeRef}
+              className="w-full"
+              style={{ height: '260px', border: 'none' }}
+              title="Signature Preview"
+              sandbox="allow-same-origin"
+            />
+          </div>
 
-      {/* Instructions */}
-      <div className="bg-muted/50 rounded-lg p-6">
-        <h3 className="font-semibold text-foreground mb-3">How to use:</h3>
-        <ol className="space-y-2 text-sm text-muted-foreground">
-          <li>1. Click the "Copy Email Signature" button above</li>
-          <li>2. Open your email client settings (Gmail, Outlook, etc.)</li>
-          <li>3. Navigate to the signature settings</li>
-          <li>4. Paste the signature (Ctrl+V or Cmd+V)</li>
-          <li>5. Save your settings</li>
-        </ol>
+          {/* HTML source view */}
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="px-4 py-2 border-b border-border bg-muted/30 text-xs text-muted-foreground font-medium">
+              HTML Source
+            </div>
+            <pre className="p-4 text-xs text-muted-foreground overflow-x-auto max-h-32 font-mono whitespace-pre-wrap break-all">
+              {html}
+            </pre>
+          </div>
+
+          <button
+            onClick={copyToClipboard}
+            className="w-full py-3.5 rounded-xl font-semibold text-white text-base transition-colors"
+            style={{ backgroundColor: copied ? '#10b981' : primaryColor }}
+          >
+            {copied ? '✓ Copied to Clipboard!' : 'Copy Signature'}
+          </button>
+        </div>
       </div>
     </div>
   );

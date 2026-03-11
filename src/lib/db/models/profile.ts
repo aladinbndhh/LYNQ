@@ -61,6 +61,12 @@ const ProfileSchema = new Schema<IProfile>(
         default: '',
       },
       customDomain: String,
+      theme: {
+        type: String,
+        enum: ['light', 'dark', 'gradient', 'glass', 'neon'],
+        default: 'light',
+      },
+      backgroundImage: String,
     },
     contactInfo: {
       email: String,

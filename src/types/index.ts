@@ -58,6 +58,8 @@ export interface IProfile {
     primaryColor: string;
     logo: string;
     customDomain?: string;
+    theme?: 'light' | 'dark' | 'gradient' | 'glass' | 'neon';
+    backgroundImage?: string;
   };
   contactInfo: {
     email?: string;

@@ -1,21 +1,82 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { OdooClient } from '@/lib/integrations/odoo-client';
-import { Tenant } from '@/lib/db/models';
+import GoogleProvider from 'next-auth/providers/google';
+import connectDB from '@/lib/db/connection';
+import { User, Tenant } from '@/lib/db/models';
+import { verifyPassword, hashPassword } from '@/lib/utils/auth';
 
-// Get Odoo config from environment or tenant
-async function getOdooConfig() {
-  // For now, use hardcoded Odoo URL from env
-  // Later, this can be per-tenant
-  const odooUrl = process.env.ODOO_URL || 'http://localhost:8069';
-  // Database is optional for HTTP JSON web session authentication
-  const odooDb = process.env.ODOO_DATABASE || undefined;
-  
-  return { url: odooUrl, database: odooDb };
+/**
+ * Find or create a MongoDB user+tenant from a Google OAuth profile.
+ * Returns { userId, tenantId, name, role }.
+ */
+async function findOrCreateGoogleUser(profile: {
+  email: string;
+  name: string;
+  image?: string;
+}) {
+  await connectDB();
+
+  let user = await User.findOne({ email: profile.email.toLowerCase() });
+  if (user) {
+    return {
+      userId: user._id.toString(),
+      tenantId: user.tenantId.toString(),
+      name: user.name,
+      role: user.role as 'admin' | 'user',
+    };
+  }
+
+  // First time — create tenant + admin user
+  const emailDomain = profile.email.split('@')[1];
+  const companyGuess = emailDomain
+    .replace(/\.(com|io|co|net|org|app)$/, '')
+    .replace(/^www\./, '')
+    .split('.')[0];
+  const companyName = companyGuess.charAt(0).toUpperCase() + companyGuess.slice(1);
+
+  const tenant = await Tenant.create({
+    name: companyName,
+    email: profile.email.toLowerCase(),
+    subscriptionTier: 'free',
+    aiUsageLimit: 50,
+    aiUsageCount: 0,
+  });
+
+  // Random password hash for Google-only accounts (they'll never use it)
+  const passwordHash = await hashPassword(crypto.randomUUID());
+
+  user = await User.create({
+    tenantId: tenant._id,
+    email: profile.email.toLowerCase(),
+    passwordHash,
+    name: profile.name,
+    role: 'admin',
+  });
+
+  return {
+    userId: user._id.toString(),
+    tenantId: tenant._id.toString(),
+    name: user.name,
+    role: 'admin' as const,
+  };
 }
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    // ── Google OAuth ─────────────────────────────────────────────────────────
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          prompt: 'select_account',
+          access_type: 'offline',
+          response_type: 'code',
+        },
+      },
+    }),
+
+    // ── Email / Password ─────────────────────────────────────────────────────
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
@@ -27,122 +88,93 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Email and password are required');
         }
 
-        try {
-          const { url, database } = await getOdooConfig();
-          
-          // Try authenticating with email first, then try as login
-          let client = new OdooClient({
-            url,
-            database,
-            username: credentials.email,
-            password: credentials.password,
-          });
+        await connectDB();
 
-          let uid: number | null = null;
-          let loginField = credentials.email;
-          
-          try {
-            uid = await client.authenticate();
-          } catch (authError: any) {
-            // If authentication fails, try using email as login directly
-            // In Odoo, login can be email or a separate login field
-            console.log('First auth attempt failed, trying with email as login...');
-            
-            // Try again with the same credentials (sometimes it's just a network issue)
-            try {
-              uid = await client.authenticate();
-            } catch (retryError: any) {
-              console.error('Odoo authentication details:', {
-                url,
-                database,
-                username: credentials.email,
-                error: retryError.message || retryError
-              });
-              throw new Error(`Odoo authentication failed: ${retryError.message || 'Access Denied. Please check your credentials and database name.'}`);
-            }
-          }
-          
-          if (!uid || uid <= 0) {
-            throw new Error('Invalid email or password');
-          }
+        const user = await User.findOne({ email: credentials.email.toLowerCase() });
+        if (!user) throw new Error('Invalid email or password');
 
-          // Get user info from Odoo
-          const users = await client.searchRead(
-            'res.users',
-            [['id', '=', uid]],
-            ['id', 'name', 'email', 'login', 'partner_id'],
-            1
-          );
+        const isValid = await verifyPassword(credentials.password, user.passwordHash);
+        if (!isValid) throw new Error('Invalid email or password');
 
-          if (users.length === 0) {
-            throw new Error('User not found');
-          }
-
-          const odooUser = users[0];
-          
-          // Get partner/company info
-          let tenantId = null;
-          if (odooUser.partner_id) {
-            const partners = await client.searchRead(
-              'res.partner',
-              [['id', '=', odooUser.partner_id[0]]],
-              ['company_id'],
-              1
-            );
-            if (partners.length > 0 && partners[0].company_id) {
-              tenantId = partners[0].company_id[0].toString();
-            }
-        }
+        const tenant = await Tenant.findById(user.tenantId);
+        if (!tenant) throw new Error('Account configuration error. Please contact support.');
 
         return {
-            id: odooUser.id.toString(),
-            email: odooUser.email || odooUser.login,
-            name: odooUser.name,
-            tenantId: tenantId || odooUser.id.toString(), // Use user ID as fallback
-            role: 'user', // Default role
-            odooUserId: odooUser.id,
-            odooPassword: credentials.password, // Store for API calls (in production, use session tokens)
-          };
-        } catch (error: any) {
-          console.error('Odoo authentication error:', {
-            message: error.message,
-            stack: error.stack,
-            url: process.env.ODOO_URL,
-            database: process.env.ODOO_DATABASE,
-          });
-          
-          // Provide more helpful error messages
-          if (error.message?.includes('Access Denied') || error.message?.includes('access denied')) {
-            throw new Error('Access Denied. Please verify:\n1. Your email/username is correct\n2. Your password is correct\n3. The Odoo URL is accessible');
-          }
-          
-          throw new Error(error.message || 'Invalid email or password');
-        }
+          id: user._id.toString(),
+          email: user.email,
+          name: user.name,
+          tenantId: user.tenantId.toString(),
+          role: user.role,
+        };
       },
     }),
   ],
+
   session: {
     strategy: 'jwt',
-    maxAge: 7 * 24 * 60 * 60, // 7 days
+    maxAge: 7 * 24 * 60 * 60,
   },
+
   pages: {
     signIn: '/login',
     signOut: '/login',
     error: '/login',
   },
+
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
+    async signIn({ user, account, profile }) {
+      // Google sign-in: ensure MongoDB record exists
+      if (account?.provider === 'google' && profile?.email) {
+        try {
+          await findOrCreateGoogleUser({
+            email: profile.email,
+            name: (profile as any).name || profile.email.split('@')[0],
+            image: (profile as any).picture,
+          });
+          return true;
+        } catch (err) {
+          console.error('Google sign-in error:', err);
+          return false;
+        }
+      }
+      return true;
+    },
+
+    async jwt({ token, user, account, profile }) {
+      // Initial sign-in via credentials
+      if (user && account?.provider === 'credentials') {
         token.id = user.id;
-        token.email = user.email;
-        token.name = user.name;
+        token.email = user.email!;
+        token.name = user.name!;
         token.tenantId = (user as any).tenantId;
         token.role = (user as any).role;
-        token.odooUserId = (user as any).odooUserId;
-        token.odooPassword = (user as any).odooPassword; // Store password for API calls
       }
+
+      // Initial sign-in via Google — look up MongoDB user
+      if (account?.provider === 'google' && profile?.email) {
+        try {
+          const mongoUser = await findOrCreateGoogleUser({
+            email: profile.email,
+            name: (profile as any).name || profile.email.split('@')[0],
+            image: (profile as any).picture,
+          });
+          token.id = mongoUser.userId;
+          token.tenantId = mongoUser.tenantId;
+          token.role = mongoUser.role;
+          token.name = mongoUser.name;
+          token.email = profile.email;
+          // Pass Google avatar through
+          if ((profile as any).picture) {
+            token.picture = (profile as any).picture;
+          }
+        } catch (err) {
+          console.error('JWT Google callback error:', err);
+        }
+      }
+
       return token;
     },
+
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
@@ -150,11 +182,14 @@ export const authOptions: NextAuthOptions = {
         session.user.name = token.name as string;
         session.user.tenantId = token.tenantId as string;
         session.user.role = token.role as 'admin' | 'user';
-        (session.user as any).odooUserId = token.odooUserId as number;
-        (session as any).odooPassword = token.odooPassword as string;
+        // Pass avatar (Google profile picture)
+        if (token.picture) {
+          (session.user as any).image = token.picture;
+        }
       }
       return session;
     },
   },
+
   secret: process.env.NEXTAUTH_SECRET,
 };

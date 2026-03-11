@@ -1,305 +1,311 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { signOut } from 'next-auth/react';
 import {
-  Eye,
-  Users,
-  Calendar,
-  TrendingUp,
-  TrendingDown,
-  UserCircle,
-  FileText,
-  CalendarCheck,
-  Settings,
-  BarChart3,
-  Share2,
-  ArrowRight,
-  Sparkles,
-  Mail,
+  Eye, Users, Calendar, TrendingUp, TrendingDown,
+  UserCircle, FileText, CalendarCheck, Settings,
+  BarChart3, Mail, ArrowRight, Sparkles,
+  CreditCard, Zap, LogOut, ChevronDown,
 } from 'lucide-react';
 
-interface StatCardProps {
-  title: string;
-  value: string;
-  change: string;
-  trend: 'up' | 'down';
-  icon: React.ReactNode;
+interface DashboardStats {
+  profiles: number;
+  leads: { total: number; thisMonth: number; changePercent: number; byStatus: Record<string, number> };
+  meetings: { total: number; upcoming: number; thisMonth: number; changePercent: number };
+  views: { total: number; thisMonth: number; changePercent: number };
+  recentActivity: { _id: string; count: number }[];
 }
-
-const StatCard: React.FC<StatCardProps> = ({ title, value, change, trend, icon }) => {
-  return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <h3 className="text-3xl font-bold mt-2">{value}</h3>
-            <div className="flex items-center mt-2 gap-1">
-              {trend === 'up' ? (
-                <TrendingUp className="w-4 h-4 text-green-500" />
-              ) : (
-                <TrendingDown className="w-4 h-4 text-red-500" />
-              )}
-              <span
-                className={`text-sm font-medium ${trend === 'up' ? 'text-green-500' : 'text-red-500'}`}
-              >
-                {change}
-              </span>
-              <span className="text-sm text-muted-foreground">vs last month</span>
-            </div>
-          </div>
-          <div className="ml-4 p-3 bg-primary/10 rounded-lg">{icon}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-interface ActionCardProps {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  buttonText: string;
-  href: string;
-}
-
-const ActionCard: React.FC<ActionCardProps> = ({ title, description, icon, buttonText, href }) => {
-  return (
-    <Card className="hover:shadow-lg transition-all hover:border-primary/50">
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="p-2 bg-primary/10 rounded-lg mb-4">{icon}</div>
-        </div>
-        <CardTitle className="text-xl">{title}</CardTitle>
-        <CardDescription className="text-base">{description}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Link href={href}>
-          <Button className="w-full" variant="outline">
-            {buttonText}
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-        </Link>
-      </CardContent>
-    </Card>
-  );
-};
 
 interface ModernDashboardProps {
   userName: string;
+  userEmail?: string;
   userAvatar?: string;
 }
 
-export function ModernDashboard({ userName, userAvatar }: ModernDashboardProps) {
-  const stats = [
-    {
-      title: 'Profile Views',
-      value: '12,543',
-      change: '+12.5%',
-      trend: 'up' as const,
-      icon: <Eye className="w-6 h-6 text-primary" />,
-    },
-    {
-      title: 'Leads Captured',
-      value: '1,847',
-      change: '+8.2%',
-      trend: 'up' as const,
-      icon: <Users className="w-6 h-6 text-primary" />,
-    },
-    {
-      title: 'Meetings Booked',
-      value: '342',
-      change: '+15.3%',
-      trend: 'up' as const,
-      icon: <Calendar className="w-6 h-6 text-primary" />,
-    },
-  ];
+function StatCard({ title, value, sub, changePercent, icon, color }: {
+  title: string; value: string; sub?: string; changePercent?: number; icon: React.ReactNode; color: string;
+}) {
+  const up = changePercent !== undefined && changePercent >= 0;
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between mb-4">
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center`} style={{ background: color + '20' }}>
+          <span style={{ color }}>{icon}</span>
+        </div>
+        {changePercent !== undefined && (
+          <span className={`text-xs font-semibold flex items-center gap-0.5 px-2 py-1 rounded-full ${up ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
+            {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+            {Math.abs(changePercent)}%
+          </span>
+        )}
+      </div>
+      <p className="text-3xl font-extrabold text-foreground">{value}</p>
+      <p className="text-sm font-medium text-muted-foreground mt-1">{title}</p>
+      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+    </div>
+  );
+}
 
-  const actionCards = [
-    {
-      title: 'Manage Profiles',
-      description: 'Update your professional profiles and customize your digital presence',
-      icon: <UserCircle className="w-6 h-6 text-primary" />,
-      buttonText: 'Edit Profiles',
-      href: '/dashboard/profiles',
-    },
-    {
-      title: 'View Leads',
-      description: 'Access and manage all your captured leads in one centralized location',
-      icon: <FileText className="w-6 h-6 text-primary" />,
-      buttonText: 'View All Leads',
-      href: '/dashboard/leads',
-    },
-    {
-      title: 'Schedule Meetings',
-      description: 'Book and manage meetings with your prospects and clients',
-      icon: <CalendarCheck className="w-6 h-6 text-primary" />,
-      buttonText: 'Open Calendar',
-      href: '/dashboard/meetings',
-    },
-    {
-      title: 'Analytics',
-      description: 'Track performance metrics and gain insights into your engagement',
-      icon: <BarChart3 className="w-6 h-6 text-primary" />,
-      buttonText: 'View Analytics',
-      href: '/dashboard/analytics',
-    },
-    {
-      title: 'Email Signature',
-      description: 'Generate professional email signatures with your company logo badge',
-      icon: <Mail className="w-6 h-6 text-primary" />,
-      buttonText: 'Generate Signature',
-      href: '/dashboard/email-signature',
-    },
-    {
-      title: 'Settings',
-      description: 'Configure your account preferences and integrations',
-      icon: <Settings className="w-6 h-6 text-primary" />,
-      buttonText: 'Manage Settings',
-      href: '/dashboard/settings',
-    },
+function QuickAction({ title, description, icon, href, color }: {
+  title: string; description: string; icon: React.ReactNode; href: string; color: string;
+}) {
+  return (
+    <Link href={href} className="group bg-card border border-border rounded-2xl p-5 flex items-start gap-4 hover:border-primary/40 hover:shadow-md transition-all">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0`} style={{ background: color + '20' }}>
+        <span style={{ color }}>{icon}</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-foreground text-sm">{title}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
+      </div>
+      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0 mt-0.5" />
+    </Link>
+  );
+}
+
+export function ModernDashboard({ userName, userEmail, userAvatar }: ModernDashboardProps) {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/dashboard/stats')
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setStats(d.data); })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toString();
+
+  const statCards = stats
+    ? [
+        {
+          title: 'Profile Views', value: fmt(stats.views.total),
+          sub: `${fmt(stats.views.thisMonth)} this month`,
+          changePercent: stats.views.changePercent,
+          icon: <Eye className="w-5 h-5" />, color: '#3b82f6',
+        },
+        {
+          title: 'Leads Captured', value: fmt(stats.leads.total),
+          sub: `${fmt(stats.leads.thisMonth)} this month`,
+          changePercent: stats.leads.changePercent,
+          icon: <Users className="w-5 h-5" />, color: '#8b5cf6',
+        },
+        {
+          title: 'Meetings Booked', value: fmt(stats.meetings.total),
+          sub: `${stats.meetings.upcoming} upcoming`,
+          changePercent: stats.meetings.changePercent,
+          icon: <Calendar className="w-5 h-5" />, color: '#10b981',
+        },
+        {
+          title: 'Business Cards', value: stats.profiles.toString(),
+          sub: 'Active profiles',
+          icon: <CreditCard className="w-5 h-5" />, color: '#f59e0b',
+        },
+      ]
+    : [];
+
+  const quickActions = [
+    { title: 'Business Cards', description: 'Create and customize your digital cards', icon: <CreditCard className="w-5 h-5" />, href: '/dashboard/profiles', color: '#3b82f6' },
+    { title: 'Leads', description: 'View and manage captured leads', icon: <FileText className="w-5 h-5" />, href: '/dashboard/leads', color: '#8b5cf6' },
+    { title: 'Meetings', description: 'Schedule and track appointments', icon: <CalendarCheck className="w-5 h-5" />, href: '/dashboard/meetings', color: '#10b981' },
+    { title: 'Analytics', description: 'Track engagement and performance', icon: <BarChart3 className="w-5 h-5" />, href: '/dashboard/analytics', color: '#f59e0b' },
+    { title: 'Email Signature', description: 'Build branded email signatures', icon: <Mail className="w-5 h-5" />, href: '/dashboard/email-signature', color: '#ec4899' },
+    { title: 'Billing', description: 'Manage subscription and usage', icon: <Zap className="w-5 h-5" />, href: '/dashboard/billing', color: '#ef4444' },
   ];
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-rose-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                L
-              </div>
-              <span className="text-xl font-bold">LynQ</span>
+      {/* Nav */}
+      <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-5 h-16 flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-rose-500 rounded-xl flex items-center justify-center">
+              <CreditCard className="w-5 h-5 text-white" />
             </div>
-            <nav className="hidden md:flex items-center gap-6">
+            <span className="text-lg font-extrabold bg-gradient-to-r from-indigo-500 to-rose-500 bg-clip-text text-transparent">
+              LynQ
+            </span>
+          </div>
+
+          {/* Nav links */}
+          <nav className="hidden md:flex items-center gap-1">
+            {[
+              { label: 'Dashboard', href: '/dashboard' },
+              { label: 'Cards', href: '/dashboard/profiles' },
+              { label: 'Leads', href: '/dashboard/leads' },
+              { label: 'Analytics', href: '/dashboard/analytics' },
+            ].map((item) => (
               <Link
-                href="/dashboard"
-                className="text-sm font-medium text-primary transition-colors"
+                key={item.href}
+                href={item.href}
+                className="px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
               >
-                Dashboard
+                {item.label}
               </Link>
-              <Link
-                href="/dashboard/profiles"
-                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-              >
-                Business Cards
-              </Link>
-              <Link
-                href="/dashboard/leads"
-                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-              >
-                Leads
-              </Link>
-            </nav>
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard/settings">
-                <Button variant="ghost" size="sm">
-                  <Settings className="w-4 h-4" />
-                </Button>
-              </Link>
-              <Avatar>
+            ))}
+          </nav>
+
+          {/* User menu */}
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-muted/50 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-rose-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                 {userAvatar ? (
-                  <AvatarImage src={userAvatar} />
+                  <img src={userAvatar} alt="" className="w-full h-full rounded-full object-cover" />
                 ) : (
-                  <AvatarFallback>{userName.charAt(0).toUpperCase()}</AvatarFallback>
+                  userName.charAt(0).toUpperCase()
                 )}
-              </Avatar>
-            </div>
+              </div>
+              <span className="hidden md:block text-sm font-medium text-foreground max-w-[120px] truncate">
+                {userName}
+              </span>
+              <ChevronDown className="w-4 h-4 text-muted-foreground hidden md:block" />
+            </button>
+
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 w-52 bg-card border border-border rounded-xl shadow-lg z-20 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border">
+                    <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
+                    {userEmail && <p className="text-xs text-muted-foreground truncate">{userEmail}</p>}
+                  </div>
+                  <Link href="/dashboard/settings" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm text-foreground hover:bg-muted/50 transition-colors">
+                    <Settings className="w-4 h-4 text-muted-foreground" /> Settings
+                  </Link>
+                  <Link href="/dashboard/billing" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm text-foreground hover:bg-muted/50 transition-colors">
+                    <Zap className="w-4 h-4 text-muted-foreground" /> Billing
+                  </Link>
+                  <div className="border-t border-border">
+                    <button
+                      onClick={() => signOut({ callbackUrl: '/login' })}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" /> Sign Out
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-6 py-8">
-        {/* Welcome Section */}
+      <main className="max-w-7xl mx-auto px-5 py-8">
+        {/* Welcome */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Welcome back, {userName}!</h1>
-          <p className="text-lg text-muted-foreground">
-            Here's what's happening with your account today.
+          <h1 className="text-3xl font-extrabold text-foreground">
+            Welcome back, {userName.split(' ')[0]}! 👋
+          </h1>
+          <p className="text-muted-foreground mt-1 text-base">
+            {loading ? 'Loading your stats…' : "Here's what's happening with your account today."}
           </p>
         </div>
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {stats.map((stat, index) => (
-            <StatCard key={index} {...stat} />
-          ))}
-        </div>
-
-        {/* Action Cards Grid */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-6">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {actionCards.map((card, index) => (
-              <ActionCard key={index} {...card} />
+        {/* Stats grid */}
+        {loading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-card border border-border rounded-2xl p-6 animate-pulse">
+                <div className="w-11 h-11 bg-muted rounded-xl mb-4" />
+                <div className="h-8 bg-muted rounded w-16 mb-2" />
+                <div className="h-4 bg-muted rounded w-24" />
+              </div>
             ))}
+          </div>
+        ) : stats && stats.leads.total === 0 && stats.views.total === 0 && stats.meetings.total === 0 && stats.profiles === 0 ? (
+          // Empty state for new accounts
+          <div className="bg-card border border-border rounded-2xl p-8 mb-8 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-rose-500 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+              <Sparkles className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-xl font-bold text-foreground mb-2">Welcome to LynQ!</h2>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              You're all set. Create your first digital business card to start capturing leads and booking meetings.
+            </p>
+            <Link
+              href="/dashboard/profiles"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-500 to-rose-500 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
+            >
+              Create Your First Card <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {statCards.map((s) => <StatCard key={s.title} {...s} />)}
+          </div>
+        )}
+
+        {/* Lead status breakdown */}
+        {stats && stats.leads.total > 0 && (
+          <div className="bg-card border border-border rounded-2xl p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-foreground">Lead Pipeline</h2>
+              <Link href="/dashboard/leads" className="text-xs text-primary font-medium hover:underline">View all →</Link>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { key: 'new', label: 'New', color: '#3b82f6' },
+                { key: 'contacted', label: 'Contacted', color: '#8b5cf6' },
+                { key: 'qualified', label: 'Qualified', color: '#10b981' },
+                { key: 'converted', label: 'Converted', color: '#f59e0b' },
+                { key: 'lost', label: 'Lost', color: '#94a3b8' },
+              ].map(({ key, label, color }) => {
+                const count = stats.leads.byStatus[key] || 0;
+                const pct = stats.leads.total > 0 ? Math.round((count / stats.leads.total) * 100) : 0;
+                return (
+                  <div key={key} className="flex-1 min-w-[80px]">
+                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                      <span>{label}</span><span>{count}</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Quick actions */}
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-foreground mb-4">Quick Actions</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {quickActions.map((a) => <QuickAction key={a.href} {...a} />)}
           </div>
         </div>
 
-        {/* Promotional Banner - Company Logo Badge Feature */}
-        <Card className="bg-gradient-to-r from-primary/10 via-primary/5 to-background border-primary/20">
-          <CardContent className="p-8">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                  <Badge variant="secondary" className="bg-primary/20 text-primary border-0">
-                    Key Feature
-                  </Badge>
-                </div>
-                <h3 className="text-2xl font-bold mb-2">Company Logo Badge</h3>
-                <p className="text-muted-foreground mb-4">
-                  Showcase your brand identity with our company logo badge feature. Your company logo
-                  appears as a small circular badge beside your profile picture in digital cards, email
-                  signatures, and mobile apps.
-                </p>
-              <div className="flex flex-wrap gap-3">
-                <Link href="/dashboard/profile-preview">
-                  <Button>
-                    Try It Now
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </Link>
-                <Link href="/dashboard/email-signature">
-                  <Button variant="outline">Generate Signature</Button>
-                </Link>
-                <Link href="/dashboard/mobile-preview">
-                  <Button variant="outline">Mobile Preview</Button>
-                </Link>
-                <Link href="/pricing">
-                  <Button variant="outline">View Pricing</Button>
-                </Link>
+        {/* Feature banner */}
+        <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-500 rounded-2xl p-8 text-white">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-5 h-5 text-yellow-300" />
+                <span className="text-sm font-semibold text-white/80 uppercase tracking-wide">Pro Feature</span>
               </div>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="relative">
-                  <div className="w-48 h-48 bg-card rounded-2xl border-2 border-border shadow-xl flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="relative inline-block">
-                        <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                          <UserCircle className="w-12 h-12 text-primary" />
-                        </div>
-                        <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-white rounded-full border-2 border-background shadow-lg flex items-center justify-center">
-                          <div className="w-6 h-6 bg-primary/20 rounded-full" />
-                        </div>
-                      </div>
-                      <p className="text-sm font-medium">Logo Badge</p>
-                    </div>
-                  </div>
-                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-indigo-500 to-rose-500 rounded-full flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-white" />
-                  </div>
-                </div>
-              </div>
+              <h3 className="text-2xl font-extrabold mb-2">Custom Domain + White Label</h3>
+              <p className="text-white/80 text-sm max-w-md">
+                Host your digital cards on your own domain. Remove all LynQ branding and make it truly yours.
+              </p>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex gap-3 flex-shrink-0">
+              <Link href="/dashboard/billing" className="px-5 py-2.5 bg-white text-indigo-600 font-semibold rounded-xl text-sm hover:bg-white/90 transition-colors">
+                Upgrade Now
+              </Link>
+              <Link href="/dashboard/profiles" className="px-5 py-2.5 bg-white/20 text-white font-semibold rounded-xl text-sm hover:bg-white/30 transition-colors">
+                View Cards
+              </Link>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );

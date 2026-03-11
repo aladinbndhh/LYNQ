@@ -1,0 +1,52 @@
+name: lynq_mobile
+description: LynQ digital business card mobile app — Popl-style card sharing and lead management.
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP client
+  dio: ^5.7.0
+  # Secure token storage
+  flutter_secure_storage: ^9.2.2
+  # State management
+  provider: ^6.1.2
+  # Navigation
+  go_router: ^14.6.2
+  # QR code display
+  qr_flutter: ^4.1.0
+  # QR code scanning
+  mobile_scanner: ^5.2.3
+  # NFC (read/write)
+  flutter_nfc_kit: ^3.4.1
+  # Image picker (avatar upload)
+  image_picker: ^1.1.2
+  # Share card URL
+  share_plus: ^10.1.2
+  # Open URLs (billing portal)
+  url_launcher: ^6.3.1
+  # Color picker
+  flutter_colorpicker: ^1.1.0
+  # Date/time formatting
+  intl: ^0.19.0
+  # Cached network images
+  cached_network_image: ^3.4.1
+  # Icons
+  cupertino_icons: ^1.0.8
+  # Animations
+  flutter_animate: ^4.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/

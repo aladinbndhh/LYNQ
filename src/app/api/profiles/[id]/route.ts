@@ -1,66 +1,80 @@
 import { NextRequest } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { OdooProfileService } from '@/lib/services/odoo-profile.service';
+import connectDB from '@/lib/db/connection';
+import { ProfileService } from '@/lib/services/profile.service';
+import { requireAuth } from '@/lib/middleware/auth';
+import { createTenantContext } from '@/lib/middleware/tenant';
+import { IProfile } from '@/types';
 import {
   successResponse,
   errorResponse,
   unauthorizedResponse,
   notFoundResponse,
+  parseRequestBody,
 } from '@/lib/utils/api';
 
-// GET /api/profiles/:id - Get profile by ID from Odoo
+// GET /api/profiles/:id
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await connectDB();
     const { id } = await params;
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return unauthorizedResponse();
-    }
+    const session = await requireAuth(request);
+    const tenantContext = createTenantContext(session);
 
-    // Get Odoo credentials from session
-    const odooEmail = session.user.email;
-    const odooPassword = (session as any).odooPassword;
-    
-    if (!odooPassword) {
-      return errorResponse('Odoo credentials not found in session', 401);
-    }
-
-    const profile = await OdooProfileService.getProfileById(
-      odooEmail,
-      odooPassword,
-      parseInt(id)
-    );
-
-    if (!profile) {
-      return notFoundResponse('Profile not found');
-    }
+    const profile = await ProfileService.getProfileById(id, tenantContext);
+    if (!profile) return notFoundResponse('Profile not found');
 
     return successResponse(profile);
   } catch (error: any) {
-    if (error.message === 'Unauthorized') {
-      return unauthorizedResponse();
-    }
+    if (error.message === 'Unauthorized') return unauthorizedResponse();
     return errorResponse(error.message || 'Failed to fetch profile', 500);
   }
 }
 
-// PUT /api/profiles/:id - NOT ALLOWED (profiles updated in Odoo only)
+// PUT /api/profiles/:id
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return errorResponse('Profiles must be updated in Odoo. This endpoint is read-only.', 405);
+  try {
+    await connectDB();
+    const { id } = await params;
+    const session = await requireAuth(request);
+    const tenantContext = createTenantContext(session);
+
+    const body = await parseRequestBody<Partial<IProfile>>(request);
+    if (!body) return errorResponse('Invalid request body', 400);
+
+    const profile = await ProfileService.updateProfile(id, body, tenantContext);
+    if (!profile) return notFoundResponse('Profile not found');
+
+    return successResponse(profile, 'Profile updated successfully');
+  } catch (error: any) {
+    if (error.message === 'Unauthorized') return unauthorizedResponse();
+    if (error.message === 'Username already taken') return errorResponse(error.message, 409);
+    return errorResponse(error.message || 'Failed to update profile', 500);
+  }
 }
 
-// DELETE /api/profiles/:id - NOT ALLOWED (profiles deleted in Odoo only)
+// DELETE /api/profiles/:id
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return errorResponse('Profiles must be deleted in Odoo. This endpoint is read-only.', 405);
+  try {
+    await connectDB();
+    const { id } = await params;
+    const session = await requireAuth(request);
+    const tenantContext = createTenantContext(session);
+
+    const deleted = await ProfileService.deleteProfile(id, tenantContext);
+    if (!deleted) return notFoundResponse('Profile not found');
+
+    return successResponse({ deleted: true }, 'Profile deleted successfully');
+  } catch (error: any) {
+    if (error.message === 'Unauthorized') return unauthorizedResponse();
+    return errorResponse(error.message || 'Failed to delete profile', 500);
+  }
 }

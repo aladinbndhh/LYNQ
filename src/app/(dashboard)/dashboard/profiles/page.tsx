@@ -1,186 +1,314 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { IProfile } from '@/types';
+import { CardEditor } from '@/components/profiles/card-editor';
 
-export default function ProfilesListPage() {
-  const router = useRouter();
+type View = 'list' | 'create' | 'edit';
+
+const EMPTY_PROFILE: Partial<IProfile> = {
+  displayName: '',
+  username: '',
+  title: '',
+  company: '',
+  bio: '',
+  branding: { primaryColor: '#3b82f6', logo: '', theme: 'light' },
+  contactInfo: {},
+  aiConfig: { enabled: true, personality: 'professional and friendly', greeting: 'Hello! How can I help you today?', qualificationQuestions: [], autoBooking: true },
+  isPublic: true,
+  language: 'en',
+  timezone: 'UTC',
+};
+
+export default function ProfilesPage() {
   const [profiles, setProfiles] = useState<IProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [view, setView] = useState<View>('list');
+  const [editProfile, setEditProfile] = useState<Partial<IProfile>>(EMPTY_PROFILE);
+  const [editId, setEditId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchProfiles();
-  }, []);
+  useEffect(() => { fetchProfiles(); }, []);
 
   const fetchProfiles = async () => {
+    setLoading(true);
     try {
-      const response = await fetch('/api/profiles');
-      const data = await response.json();
-
-      if (data.success) {
-        setProfiles(data.data);
-      } else {
-        setError(data.error || 'Failed to fetch profiles');
-      }
+      const res = await fetch('/api/profiles');
+      const data = await res.json();
+      if (data.success) setProfiles(data.data);
+      else setError(data.error || 'Failed to fetch profiles');
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch profiles');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSave = async () => {
+    if (!editProfile.displayName || !editProfile.username) {
+      setError('Display name and username are required');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const url = editId ? `/api/profiles/${editId}` : '/api/profiles';
+      const method = editId ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editProfile),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchProfiles();
+        setView('list');
+        setEditId(null);
+        setEditProfile(EMPTY_PROFILE);
+      } else {
+        setError(data.error || 'Failed to save profile');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this profile? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) setProfiles((p) => p.filter((x) => String(x._id) !== id));
+      else alert(data.error || 'Failed to delete');
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const startEdit = (profile: IProfile) => {
+    setEditId(String(profile._id));
+    setEditProfile({ ...profile });
+    setView('edit');
+    setError('');
+  };
+
+  const startCreate = () => {
+    setEditId(null);
+    setEditProfile({ ...EMPTY_PROFILE });
+    setView('create');
+    setError('');
+  };
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  if (view === 'create' || view === 'edit') {
+    return (
+      <div className="min-h-screen bg-background">
+        <nav className="bg-card shadow-sm border-b border-border">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <Link href="/dashboard" className="text-xl font-bold bg-gradient-to-r from-indigo-500 to-rose-500 bg-clip-text text-transparent">
+                LynQ
+              </Link>
+              <button onClick={() => { setView('list'); setError(''); }} className="text-muted-foreground hover:text-foreground text-sm">
+                ← Back to Cards
+              </button>
+            </div>
+            <div className="flex items-center gap-3">
+              {error && <p className="text-red-500 text-sm">{error}</p>}
+              <button
+                onClick={() => { setView('list'); setError(''); }}
+                className="px-4 py-2 text-sm border border-border rounded-xl text-muted-foreground hover:bg-muted/50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-5 py-2 text-sm font-semibold rounded-xl text-white transition-colors disabled:opacity-50"
+                style={{ background: '#3b82f6' }}
+              >
+                {saving ? 'Saving…' : view === 'edit' ? 'Save Changes' : 'Create Card'}
+              </button>
+            </div>
+          </div>
+        </nav>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-foreground">
+              {view === 'edit' ? 'Edit Business Card' : 'Create Business Card'}
+            </h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Customize your digital card — changes reflect in the live preview instantly
+            </p>
+          </div>
+
+          {/* Username field */}
+          {view === 'create' && (
+            <div className="bg-card border border-border rounded-xl p-4 mb-6 flex items-center gap-4">
+              <div className="flex-1">
+                <label className="text-xs text-muted-foreground mb-1 block">Card URL slug (unique)</label>
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground text-sm">{appUrl || 'https://app.lynq.io'}/</span>
+                  <input
+                    type="text"
+                    value={editProfile.username || ''}
+                    onChange={(e) => setEditProfile({ ...editProfile, username: e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, '') })}
+                    placeholder="your-name"
+                    className="flex-1 text-sm border-b border-border bg-transparent py-1 text-foreground focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <CardEditor
+            profile={editProfile}
+            onChange={(updated) => setEditProfile(updated)}
+          />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center gap-8">
-              <Link href="/dashboard" className="text-2xl font-bold text-blue-600">
-                LynQ
-              </Link>
-              <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
-                Dashboard
-              </Link>
-            </div>
+    <div className="min-h-screen bg-background">
+      <nav className="bg-card shadow-sm border-b border-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <Link href="/dashboard" className="text-xl font-bold bg-gradient-to-r from-indigo-500 to-rose-500 bg-clip-text text-transparent">
+              LynQ
+            </Link>
+            <Link href="/dashboard" className="text-muted-foreground hover:text-foreground text-sm">
+              Dashboard
+            </Link>
           </div>
+          <button
+            onClick={startCreate}
+            className="px-5 py-2 text-sm font-semibold rounded-xl text-white"
+            style={{ background: '#3b82f6' }}
+          >
+            + New Card
+          </button>
         </div>
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900">Your Business Cards</h2>
-          <p className="text-gray-600 mt-2">View your digital business cards with QR codes</p>
+          <h1 className="text-3xl font-bold text-foreground">Your Business Cards</h1>
+          <p className="text-muted-foreground mt-1">Create and manage your digital business cards</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
             {error}
           </div>
         )}
 
         {profiles.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
-            <div className="text-6xl mb-4">👤</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No business cards yet</h3>
-            <p className="text-gray-600">
-              Business cards are created in Odoo. Once created, they will appear here.
-            </p>
+          <div className="bg-card rounded-2xl border border-border p-16 text-center">
+            <div className="text-6xl mb-4">💳</div>
+            <h3 className="text-xl font-semibold text-foreground mb-2">No business cards yet</h3>
+            <p className="text-muted-foreground mb-6">Create your first digital business card and share it with the world.</p>
+            <button
+              onClick={startCreate}
+              className="px-6 py-3 rounded-xl font-semibold text-white"
+              style={{ background: '#3b82f6' }}
+            >
+              Create Your First Card
+            </button>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
             {profiles.map((profile) => {
-              // Get Odoo URL for contact page link
-              // Extract base URL from QR code image URL if available, otherwise use default
-              let odooBaseUrl = 'https://aladinbndhh-lynq-test-live-29061122.dev.odoo.com';
-              if (profile.qrCode && profile.qrCode.includes('/web/image')) {
-                // Extract base URL from QR code image URL
-                odooBaseUrl = profile.qrCode.split('/web/image')[0];
-              }
-              const contactUrl = `${odooBaseUrl}/lynq/contact/${profile.username}`;
-              
+              const primaryColor = profile.branding?.primaryColor || '#3b82f6';
+              const cardUrl = `${appUrl}/${profile.username}`;
+              const isDark = profile.branding?.theme === 'dark' || profile.branding?.theme === 'neon';
               return (
-                <div key={String(profile.id || profile._id)} className="bg-white rounded-lg shadow-lg p-6 border-2" style={{ borderColor: profile.branding?.primaryColor || '#3b82f6' }}>
-                  {/* Business Card Header */}
-                  <div className="text-center mb-6">
-                    <div className="flex items-center justify-center gap-2 mb-4">
-                      {profile.avatar ? (
-                        <img 
-                          src={profile.avatar} 
-                          alt={profile.displayName}
-                          className="w-24 h-24 rounded-full object-cover"
+                <div
+                  key={String(profile._id)}
+                  className="bg-card rounded-2xl border-2 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                  style={{ borderColor: primaryColor }}
+                >
+                  {/* Cover */}
+                  <div
+                    className="h-20"
+                    style={{
+                      background: profile.coverImage
+                        ? `url(${profile.coverImage}) center/cover`
+                        : `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}bb 100%)`,
+                    }}
+                  />
+
+                  <div className="px-5 pb-5">
+                    {/* Avatar row */}
+                    <div className="flex items-end justify-between -mt-8 mb-3">
+                      <div
+                        className="w-16 h-16 rounded-full border-4 flex items-center justify-center text-2xl font-bold text-white"
+                        style={{ background: primaryColor, borderColor: 'white' }}
+                      >
+                        {profile.displayName.charAt(0).toUpperCase()}
+                      </div>
+                      {profile.qrCode && (
+                        <img
+                          src={profile.qrCode}
+                          alt="QR"
+                          className="w-12 h-12 rounded-lg border border-border"
                         />
-                      ) : (
-                        <div
-                          className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold text-white"
-                          style={{ backgroundColor: profile.branding?.primaryColor || '#3b82f6' }}
-                        >
-                          {profile.displayName.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      {profile.company && (
-                        <div className="w-12 h-12 rounded-full bg-white border-2 border-white p-0.5 shadow-md flex-shrink-0">
-                          {profile.branding?.logo && profile.branding.logo !== 'undefined' && profile.branding.logo !== '' ? (
-                            <img 
-                              src={profile.branding.logo} 
-                              alt={profile.company || ''}
-                              className="w-full h-full rounded-full object-contain"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  const placeholder = document.createElement('div');
-                                  placeholder.className = 'w-full h-full rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-sm font-semibold';
-                                  placeholder.textContent = profile.company.charAt(0).toUpperCase();
-                                  parent.appendChild(placeholder);
-                                }
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-sm font-semibold">
-                              {profile.company.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                        </div>
                       )}
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900">{profile.displayName}</h3>
-                    {profile.title && <p className="text-gray-600 mt-1">{profile.title}</p>}
-                    {profile.company && <p className="text-gray-500 text-sm mt-1">{profile.company}</p>}
-                  </div>
 
-                  {/* Contact Info */}
-                  {profile.contactInfo && (
-                    <div className="mb-6 space-y-2 text-sm">
-                      {profile.contactInfo.email && (
-                        <div className="text-gray-600">📧 {profile.contactInfo.email}</div>
-                      )}
-                      {profile.contactInfo.phone && (
-                        <div className="text-gray-600">📱 {profile.contactInfo.phone}</div>
-                      )}
+                    <h3 className="text-lg font-bold text-foreground">{profile.displayName}</h3>
+                    {profile.title && <p className="text-sm text-muted-foreground">{profile.title}</p>}
+                    {profile.company && <p className="text-sm font-medium" style={{ color: primaryColor }}>{profile.company}</p>}
+
+                    <div className="flex items-center gap-1 mt-2">
+                      <span className="text-xs text-muted-foreground truncate">{cardUrl}</span>
                     </div>
-                  )}
 
-                  {/* QR Code */}
-                  <div className="text-center mb-6">
-                    {profile.qrCode ? (
-                      <div>
-                        <img 
-                          src={profile.qrCode} 
-                          alt="QR Code"
-                          className="w-32 h-32 mx-auto border-2 border-gray-200 rounded"
-                        />
-                        <p className="text-xs text-gray-500 mt-2">Scan to save contact</p>
-                        <p className="text-xs text-gray-400 mt-1 break-all">{contactUrl}</p>
-                      </div>
-                    ) : (
-                      <div className="w-32 h-32 mx-auto bg-gray-100 rounded flex items-center justify-center text-gray-400">
-                        No QR Code
-                      </div>
-                    )}
-                  </div>
+                    {/* Theme badge */}
+                    <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-medium capitalize"
+                      style={{ background: primaryColor + '22', color: primaryColor }}>
+                      {profile.branding?.theme || 'light'} theme
+                    </span>
 
-                  {/* View Contact Page Link */}
-                  <div className="text-center">
-                    <a
-                      href={contactUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-                    >
-                      View Contact Page
-                    </a>
+                    {/* Actions */}
+                    <div className="flex gap-2 mt-4">
+                      <a
+                        href={cardUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-2 text-sm font-medium text-center rounded-xl border border-border text-muted-foreground hover:bg-muted/50 transition-colors"
+                      >
+                        Preview
+                      </a>
+                      <button
+                        onClick={() => startEdit(profile)}
+                        className="flex-1 py-2 text-sm font-medium rounded-xl text-white transition-colors"
+                        style={{ background: primaryColor }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(String(profile._id))}
+                        className="py-2 px-3 text-sm rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
