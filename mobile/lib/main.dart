@@ -80,20 +80,12 @@ class _AppRootState extends State<AppRoot> {
   Widget build(BuildContext context) {
     if (_isLoggedIn == null) {
       return const Scaffold(
+        backgroundColor: Color(0xFF0F172A),
         body: Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            SizedBox(
-              width: 48, height: 48,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [Color(0xFF6366F1), Color(0xFFF43F5E)]),
-                  borderRadius: BorderRadius.all(Radius.circular(14)),
-                ),
-                child: Icon(Icons.credit_card, color: Colors.white, size: 26),
-              ),
-            ),
-            SizedBox(height: 16),
-            Text('LynQ', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
+            Image(image: AssetImage('assets/images/logo.png'), width: 100, height: 100),
+            SizedBox(height: 20),
+            Text('LynQ', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 1)),
           ]),
         ),
       );

@@ -68,14 +68,7 @@ class _SignupScreenState extends State<SignupScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 32),
-                Container(
-                  width: 56, height: 56,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFFF43F5E)]),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(Icons.credit_card, color: Colors.white, size: 28),
-                ),
+                Image.asset('assets/images/logo.png', width: 72, height: 72),
                 const SizedBox(height: 24),
                 const Text('Create account', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
                 const SizedBox(height: 6),

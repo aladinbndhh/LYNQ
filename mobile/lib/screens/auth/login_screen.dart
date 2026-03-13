@@ -59,16 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const SizedBox(height: 48),
                 // Logo
-                Container(
-                  width: 56, height: 56,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFFF43F5E)],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(Icons.credit_card, color: Colors.white, size: 28),
-                ),
+                Image.asset('assets/images/logo.png', width: 72, height: 72),
                 const SizedBox(height: 28),
                 const Text('Welcome back', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
                 const SizedBox(height: 6),
