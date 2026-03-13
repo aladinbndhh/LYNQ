@@ -74,6 +74,24 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  // OTP step
+  const [otpStep, setOtpStep] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Countdown timer for resend cooldown
+  const startCooldown = () => {
+    setResendCooldown(60);
+    const iv = setInterval(() => {
+      setResendCooldown((c) => {
+        if (c <= 1) { clearInterval(iv); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+  };
+
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
   const blur = (field: string) => () =>
@@ -104,14 +122,49 @@ export default function SignupPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create account');
-      const result = await signIn('credentials', { email: form.email, password: form.password, redirect: false });
-      if (result?.ok) router.push('/dashboard');
-      else router.push('/login?registered=true');
+      // Move to OTP step
+      setOtpStep(true);
+      startCooldown();
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otp.length !== 6) { setOtpError('Please enter the 6-digit code.'); return; }
+    setOtpError(''); setOtpLoading(true);
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email, code: otp }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Verification failed');
+      // Auto-login after verification
+      const result = await signIn('credentials', { email: form.email, password: form.password, redirect: false });
+      if (result?.ok) router.push('/dashboard');
+      else router.push('/login?registered=true');
+    } catch (err: any) {
+      setOtpError(err.message || 'Something went wrong.');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
+    try {
+      await fetch('/api/auth/resend-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email }),
+      });
+      startCooldown();
+    } catch {}
   };
 
   const handleGoogle = async () => {
@@ -167,6 +220,80 @@ export default function SignupPage() {
             <span className="text-lg font-extrabold bg-gradient-to-r from-indigo-500 to-rose-500 bg-clip-text text-transparent">LynQ</span>
           </div>
 
+          {/* ── OTP verification step ── */}
+          {otpStep ? (
+            <div>
+              <div className="mb-8 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                  </svg>
+                </div>
+                <h1 className="text-2xl font-extrabold text-foreground mb-1">Check your email</h1>
+                <p className="text-muted-foreground text-sm">
+                  We sent a 6-digit code to<br/>
+                  <span className="font-semibold text-foreground">{form.email}</span>
+                </p>
+              </div>
+
+              {otpError && (
+                <div className="mb-4 flex items-start gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-red-400 text-sm">
+                  <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
+                  {otpError}
+                </div>
+              )}
+
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground/80 mb-1.5">Verification Code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    autoFocus
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-center text-2xl font-bold tracking-[0.5em] placeholder:text-muted-foreground/40 placeholder:text-base placeholder:tracking-normal outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-colors"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={otpLoading || otp.length !== 6}
+                  className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white text-sm font-semibold rounded-xl hover:from-indigo-700 hover:to-indigo-600 transition-all disabled:opacity-50"
+                >
+                  {otpLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                      Verifying…
+                    </span>
+                  ) : 'Verify Email'}
+                </button>
+              </form>
+
+              <p className="mt-5 text-center text-sm text-muted-foreground">
+                Didn&apos;t receive it?{' '}
+                <button
+                  onClick={handleResendOtp}
+                  disabled={resendCooldown > 0}
+                  className="font-semibold text-primary hover:text-primary/80 disabled:text-muted-foreground disabled:cursor-not-allowed"
+                >
+                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+                </button>
+              </p>
+              <p className="mt-2 text-center text-sm text-muted-foreground">
+                Wrong email?{' '}
+                <button onClick={() => { setOtpStep(false); setOtp(''); setOtpError(''); }} className="font-semibold text-primary hover:text-primary/80">
+                  Go back
+                </button>
+              </p>
+            </div>
+          ) : (
+            <>
           <h1 className="text-2xl font-extrabold text-foreground mb-1">Create your account</h1>
           <p className="text-muted-foreground text-sm mb-6">Free forever. No credit card required.</p>
 
@@ -328,6 +455,8 @@ export default function SignupPage() {
               Sign in
             </Link>
           </p>
+          </>
+          )}
         </div>
       </div>
     </div>

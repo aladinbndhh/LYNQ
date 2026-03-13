@@ -59,7 +59,11 @@ function LoginForm() {
     try {
       const result = await signIn('credentials', { email, password, redirect: false });
       if (result?.error) {
-        setError('Invalid email or password. Please try again.');
+        if (result.error === 'EMAIL_NOT_VERIFIED') {
+          setError('Please verify your email before signing in. Check your inbox for the verification code.');
+        } else {
+          setError('Invalid email or password. Please try again.');
+        }
       } else {
         router.push('/dashboard');
       }

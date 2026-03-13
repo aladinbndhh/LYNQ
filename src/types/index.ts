@@ -39,6 +39,7 @@ export interface IUser {
   passwordHash: string;
   name: string;
   role: 'admin' | 'user';
+  emailVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

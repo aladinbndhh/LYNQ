@@ -154,6 +154,10 @@ export const authOptions: NextAuthOptions = {
         const isValid = await verifyPassword(credentials.password, user.passwordHash);
         if (!isValid) throw new Error('Invalid email or password');
 
+        if (!user.emailVerified) {
+          throw new Error('EMAIL_NOT_VERIFIED');
+        }
+
         const tenant = await Tenant.findById(user.tenantId);
         if (!tenant) throw new Error('Account configuration error. Please contact support.');
 

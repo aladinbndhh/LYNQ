@@ -29,6 +29,10 @@ const UserSchema = new Schema<IUser>(
       enum: ['admin', 'user'],
       default: 'user',
     },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
