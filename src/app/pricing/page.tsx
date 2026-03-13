@@ -72,7 +72,10 @@ export default function PricingPage() {
       {/* Nav */}
       <nav className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
-          <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-indigo-500 to-rose-500 bg-clip-text text-transparent">LynQ</Link>
+          <Link href="/" className="flex items-center gap-2.5">
+            <img src="/logo.png" alt="LynQ" className="w-8 h-8 object-contain" />
+            <span className="text-2xl font-bold bg-gradient-to-r from-indigo-500 to-rose-500 bg-clip-text text-transparent">LynQ</span>
+          </Link>
           <div className="flex items-center gap-4">
             <Link href="/login"><Button variant="ghost">Sign In</Button></Link>
             <Link href="/signup"><Button>Get Started</Button></Link>

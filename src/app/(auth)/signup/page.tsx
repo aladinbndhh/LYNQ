@@ -129,11 +129,7 @@ export default function SignupPage() {
         </div>
 
         <div className="relative flex items-center gap-3">
-          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <rect x="2" y="5" width="20" height="14" rx="2" />
-            </svg>
-          </div>
+          <img src="/logo.png" alt="LynQ" className="w-9 h-9 object-contain rounded-xl" />
           <span className="text-xl font-extrabold text-white">LynQ</span>
         </div>
 
@@ -167,11 +163,7 @@ export default function SignupPage() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-rose-500 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <rect x="2" y="5" width="20" height="14" rx="2" />
-              </svg>
-            </div>
+            <img src="/logo.png" alt="LynQ" className="w-8 h-8 object-contain" />
             <span className="text-lg font-extrabold bg-gradient-to-r from-indigo-500 to-rose-500 bg-clip-text text-transparent">LynQ</span>
           </div>
 

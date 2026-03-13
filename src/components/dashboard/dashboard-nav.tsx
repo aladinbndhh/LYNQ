@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import {
-  CreditCard, Settings, Zap, LogOut, ChevronDown,
+  Settings, Zap, LogOut, ChevronDown,
   LayoutDashboard, Users, BarChart3, CalendarCheck,
-  Mail, Menu, X,
+  CreditCard, Mail, Menu, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,9 +40,7 @@ export function DashboardNav({ userName, userEmail, userAvatar }: DashboardNavPr
 
         {/* Logo */}
         <Link href="/dashboard" className="flex items-center gap-2.5 flex-shrink-0">
-          <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-rose-500 rounded-xl flex items-center justify-center">
-            <CreditCard className="w-5 h-5 text-white" />
-          </div>
+          <img src="/logo.png" alt="LynQ" className="w-9 h-9 object-contain" />
           <span className="text-lg font-extrabold bg-gradient-to-r from-indigo-500 to-rose-500 bg-clip-text text-transparent">
             LynQ
           </span>

@@ -9,8 +9,9 @@ export default function HomePage() {
       <nav className="absolute top-0 left-0 right-0 z-50 border-b border-white/10 bg-black/20 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <Link href="/" className="text-2xl font-bold text-white">
-              LynQ
+            <Link href="/" className="flex items-center gap-2.5">
+              <img src="/logo.png" alt="LynQ" className="w-8 h-8 object-contain" />
+              <span className="text-2xl font-bold text-white">LynQ</span>
             </Link>
             <div className="flex items-center gap-4">
               <Link href="/pricing">
