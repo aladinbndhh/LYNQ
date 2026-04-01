@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
-import 'login_screen.dart' show _GoogleButton, _Divider;
+import '../../widgets/google_auth_widgets.dart';
 
 class SignupScreen extends StatefulWidget {
   final VoidCallback onSignupSuccess;
@@ -160,13 +160,13 @@ class _SignupScreenState extends State<SignupScreen> {
           const SizedBox(height: 28),
 
           // Google Sign-In
-          _GoogleButton(
+          GoogleSignInButton(
             loading: _googleLoading,
             onTap: (_loading || _googleLoading) ? null : _signInWithGoogle,
           ),
 
           const SizedBox(height: 24),
-          _Divider(),
+          const OrDivider(),
           const SizedBox(height: 24),
 
           if (_error != null) ...[
