@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../config/api_config.dart';
 
 class AuthService {
@@ -10,25 +12,14 @@ class AuthService {
 
   final Dio _dio;
   final FlutterSecureStorage _storage;
-
-  // Google Sign-In instance — serverClientId is needed to get an ID token
-  // that the backend can verify via Google's tokeninfo endpoint.
-  late final GoogleSignIn _googleSignIn;
+  final AppLinks _appLinks = AppLinks();
 
   AuthService({Dio? dio, FlutterSecureStorage? storage})
       : _dio = dio ?? Dio(),
-        _storage = storage ?? const FlutterSecureStorage() {
-    _googleSignIn = GoogleSignIn(
-      serverClientId: ApiConfig.googleClientId.isNotEmpty
-          ? ApiConfig.googleClientId
-          : null,
-      scopes: ['email', 'profile'],
-    );
-  }
+        _storage = storage ?? const FlutterSecureStorage();
 
   // ── Email / Password ────────────────────────────────────────────────────────
 
-  /// Login with email + password and persist JWT token
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await _dio.post(
       ApiConfig.loginUrl,
@@ -43,7 +34,6 @@ class AuthService {
     }
   }
 
-  /// Register a new account — returns after sending OTP (does NOT auto-login)
   Future<void> signup({
     required String name,
     required String email,
@@ -65,7 +55,6 @@ class AuthService {
     }
   }
 
-  /// Verify the OTP code sent to email
   Future<void> verifyOtp({required String email, required String code}) async {
     final response = await _dio.post(
       ApiConfig.verifyOtpUrl,
@@ -77,7 +66,6 @@ class AuthService {
     }
   }
 
-  /// Resend OTP to email
   Future<void> resendOtp({required String email}) async {
     final response = await _dio.post(
       ApiConfig.resendOtpUrl,
@@ -89,50 +77,72 @@ class AuthService {
     }
   }
 
-  // ── Google Sign-In ──────────────────────────────────────────────────────────
+  // ── Google Sign-In (browser OAuth, same flow as the website) ───────────────
 
-  /// Sign in with Google and exchange the ID token for a LynQ JWT.
-  /// Returns the session data map on success.
+  /// Opens Google OAuth in the system browser — exactly like the website.
+  /// When Google redirects back to the backend, the backend issues a JWT and
+  /// redirects to  lynq://auth?token=...  which this method catches.
   Future<Map<String, dynamic>> loginWithGoogle() async {
-    // Trigger the Google account picker
-    final googleUser = await _googleSignIn.signIn();
-    if (googleUser == null) {
-      throw Exception('Google sign-in cancelled');
+    // 1. Ask the backend for the Google OAuth URL
+    final resp = await _dio.get(ApiConfig.googleStartUrl);
+    final oauthUrl = resp.data['url'] as String?;
+    if (oauthUrl == null) {
+      throw Exception(resp.data['error'] ?? 'Failed to start Google sign-in');
     }
 
-    // Get the auth tokens (includes idToken)
-    final googleAuth = await googleUser.authentication;
-    final idToken = googleAuth.idToken;
+    // 2. Bridge between the deep-link stream and this async call
+    final completer = Completer<Map<String, dynamic>>();
+    StreamSubscription<Uri>? sub;
 
-    if (idToken == null) {
-      // Sign out of Google so the user can try again cleanly
-      await _googleSignIn.signOut();
-      throw Exception(
-        'Could not get Google ID token.\n'
-        'Make sure your Google Cloud OAuth client is configured correctly.',
-      );
+    sub = _appLinks.uriLinkStream.listen((uri) async {
+      // Only handle lynq://auth deep links
+      if (uri.scheme != 'lynq' || uri.host != 'auth') return;
+      await sub?.cancel();
+
+      final error = uri.queryParameters['error'];
+      if (error != null) {
+        completer.completeError(Exception(
+          error == 'cancelled'
+              ? 'Google sign-in cancelled'
+              : 'Google sign-in failed: $error',
+        ));
+        return;
+      }
+
+      final token = uri.queryParameters['token'];
+      if (token == null) {
+        completer.completeError(Exception('No token received'));
+        return;
+      }
+
+      final userData = {
+        'id': '',
+        'name': uri.queryParameters['name'] ?? '',
+        'email': uri.queryParameters['email'] ?? '',
+        'role': uri.queryParameters['role'] ?? 'admin',
+        'tenantId': uri.queryParameters['tenantId'] ?? '',
+        'avatar': uri.queryParameters['avatar'],
+      };
+
+      await _persistSession({'token': token, 'user': userData});
+      completer.complete({'token': token, 'user': userData});
+    });
+
+    // 3. Open the Google OAuth page in the system browser
+    final uri = Uri.parse(oauthUrl);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      await sub.cancel();
+      throw Exception('Could not open browser for Google sign-in');
     }
 
-    // Exchange with LynQ backend
-    final response = await _dio.post(
-      ApiConfig.googleAuthUrl,
-      data: {'idToken': idToken},
+    // 4. Wait for deep link (5 minute timeout)
+    return completer.future.timeout(
+      const Duration(minutes: 5),
+      onTimeout: () {
+        sub?.cancel();
+        throw Exception('Google sign-in timed out');
+      },
     );
-
-    if (response.data['success'] == true) {
-      await _persistSession(response.data['data']);
-      return response.data['data'];
-    } else {
-      await _googleSignIn.signOut();
-      throw Exception(response.data['error'] ?? 'Google sign-in failed');
-    }
-  }
-
-  /// Disconnect Google account on logout
-  Future<void> _disconnectGoogle() async {
-    try {
-      await _googleSignIn.signOut();
-    } catch (_) {}
   }
 
   // ── Session helpers ─────────────────────────────────────────────────────────
@@ -144,10 +154,8 @@ class AuthService {
     await _storage.write(key: _userKey, value: jsonEncode(userData));
   }
 
-  /// Get stored JWT token
   Future<String?> getToken() => _storage.read(key: _tokenKey);
 
-  /// Get stored user data
   Future<Map<String, dynamic>?> getUser() async {
     final raw = await _storage.read(key: _userKey);
     if (raw == null) return null;
@@ -158,22 +166,18 @@ class AuthService {
     }
   }
 
-  /// Check if user is logged in
   Future<bool> isLoggedIn() async {
     final token = await getToken();
     return token != null && token.isNotEmpty;
   }
 
-  /// Logout — clear stored credentials and disconnect Google
   Future<void> logout() async {
     await Future.wait([
       _storage.delete(key: _tokenKey),
       _storage.delete(key: _userKey),
-      _disconnectGoogle(),
     ]);
   }
 
-  /// Build auth headers for API calls
   Future<Map<String, String>> getAuthHeaders() async {
     final token = await getToken();
     if (token == null) throw Exception('Not authenticated');
