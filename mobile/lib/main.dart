@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'services/auth_service.dart';
 import 'services/profile_service.dart';
 import 'services/lead_service.dart';
+import 'screens/splash/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
@@ -60,41 +61,32 @@ class AppRoot extends StatefulWidget {
 }
 
 class _AppRootState extends State<AppRoot> {
+  // null = showing splash, true = logged in, false = logged out
   bool? _isLoggedIn;
   bool _showSignup = false;
   int _currentTab = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _checkAuth();
-  }
-
-  Future<void> _checkAuth() async {
-    final auth = context.read<AuthService>();
-    final loggedIn = await auth.isLoggedIn();
-    if (mounted) setState(() => _isLoggedIn = loggedIn);
-  }
-
-  @override
   Widget build(BuildContext context) {
+    // Splash screen: passes auth future and handles completion
     if (_isLoggedIn == null) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF0F172A),
-        body: Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Image(image: AssetImage('assets/images/logo.png'), width: 100, height: 100),
-            SizedBox(height: 20),
-            Text('LynQ', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 1)),
-          ]),
-        ),
+      final auth = context.read<AuthService>();
+      return SplashScreen(
+        authFuture: auth.isLoggedIn(),
+        onComplete: (loggedIn) {
+          if (mounted) setState(() => _isLoggedIn = loggedIn);
+        },
       );
     }
 
+    // Auth screens
     if (_isLoggedIn == false) {
       return _showSignup
           ? SignupScreen(
-              onSignupSuccess: () => setState(() => _isLoggedIn = true),
+              onSignupSuccess: () => setState(() {
+                _isLoggedIn = true;
+                _showSignup = false;
+              }),
               onGoLogin: () => setState(() => _showSignup = false),
             )
           : LoginScreen(
@@ -114,7 +106,12 @@ class _AppRootState extends State<AppRoot> {
       const CardsScreen(),
       const LeadsScreen(),
       const ScannerScreen(),
-      SettingsScreen(onLogout: () => setState(() { _isLoggedIn = false; _currentTab = 0; })),
+      SettingsScreen(
+        onLogout: () => setState(() {
+          _isLoggedIn = false;
+          _currentTab = 0;
+        }),
+      ),
     ];
 
     return Scaffold(
@@ -127,11 +124,31 @@ class _AppRootState extends State<AppRoot> {
         shadowColor: Colors.transparent,
         indicatorColor: const Color(0xFF3B82F6).withOpacity(0.12),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home, color: Color(0xFF3B82F6)), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.credit_card_outlined), selectedIcon: Icon(Icons.credit_card, color: Color(0xFF3B82F6)), label: 'Cards'),
-          NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people, color: Color(0xFF3B82F6)), label: 'Leads'),
-          NavigationDestination(icon: Icon(Icons.qr_code_scanner_outlined), selectedIcon: Icon(Icons.qr_code_scanner, color: Color(0xFF3B82F6)), label: 'Scan'),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings, color: Color(0xFF3B82F6)), label: 'Settings'),
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home, color: Color(0xFF3B82F6)),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.credit_card_outlined),
+            selectedIcon: Icon(Icons.credit_card, color: Color(0xFF3B82F6)),
+            label: 'Cards',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people, color: Color(0xFF3B82F6)),
+            label: 'Leads',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.qr_code_scanner_outlined),
+            selectedIcon: Icon(Icons.qr_code_scanner, color: Color(0xFF3B82F6)),
+            label: 'Scan',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings, color: Color(0xFF3B82F6)),
+            label: 'Settings',
+          ),
         ],
       ),
     );
