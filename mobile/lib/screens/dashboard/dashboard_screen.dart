@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../services/auth_service.dart';
 import '../../services/lead_service.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -65,11 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(
                     children: [
-                      Container(
-                        width: 40, height: 40,
-                        decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10)),
-                        child: const Icon(Icons.credit_card, color: Colors.white, size: 22),
-                      ),
+                      Image.asset('assets/images/logo.png', width: 40, height: 40),
                       const SizedBox(width: 10),
                       const Text('LynQ', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
                       const Spacer(),

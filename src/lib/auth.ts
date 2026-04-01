@@ -154,7 +154,7 @@ export const authOptions: NextAuthOptions = {
         const isValid = await verifyPassword(credentials.password, user.passwordHash);
         if (!isValid) throw new Error('Invalid email or password');
 
-        if (!user.emailVerified) {
+        if (user.emailVerified === false) {
           throw new Error('EMAIL_NOT_VERIFIED');
         }
 

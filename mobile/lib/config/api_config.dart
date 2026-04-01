@@ -1,8 +1,9 @@
-/// API configuration — update baseUrl for production
+/// API configuration
+/// Override at build time: --dart-define=API_BASE_URL=https://your-url.com
 class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3000',
+    defaultValue: 'https://lynq.cards',
   );
 
   static const String apiVersion = '/api';
@@ -10,6 +11,8 @@ class ApiConfig {
   // Auth endpoints
   static String get loginUrl => '$baseUrl$apiVersion/auth/mobile/login';
   static String get signupUrl => '$baseUrl$apiVersion/auth/signup';
+  static String get verifyOtpUrl => '$baseUrl$apiVersion/auth/verify-otp';
+  static String get resendOtpUrl => '$baseUrl$apiVersion/auth/resend-otp';
 
   // Profile endpoints
   static String get profilesUrl => '$baseUrl$apiVersion/profiles';

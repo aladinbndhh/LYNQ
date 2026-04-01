@@ -289,7 +289,9 @@ class _CardEditorScreenState extends State<_CardEditorScreen> {
 
   @override
   void dispose() {
-    for (final c in [_nameCtrl, _usernameCtrl, _titleCtrl, _companyCtrl, _bioCtrl, _emailCtrl, _phoneCtrl]) c.dispose();
+    for (final c in [_nameCtrl, _usernameCtrl, _titleCtrl, _companyCtrl, _bioCtrl, _emailCtrl, _phoneCtrl]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
