@@ -39,6 +39,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   # Animations
   flutter_animate: ^4.5.0
+  # Google Sign-In
+  google_sign_in: ^6.2.2
 
 dev_dependencies:
   flutter_test:

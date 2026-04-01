@@ -29,7 +29,7 @@ async function generateUsername(base: string): Promise<string> {
  * On first sign-in, also creates a default Profile pre-filled with
  * the user's Google name, email, and profile picture.
  */
-async function findOrCreateGoogleUser(profile: {
+export async function findOrCreateGoogleUser(profile: {
   email: string;
   name: string;
   image?: string;

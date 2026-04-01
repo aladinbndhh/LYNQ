@@ -13,6 +13,13 @@ class ApiConfig {
   static String get signupUrl => '$baseUrl$apiVersion/auth/signup';
   static String get verifyOtpUrl => '$baseUrl$apiVersion/auth/verify-otp';
   static String get resendOtpUrl => '$baseUrl$apiVersion/auth/resend-otp';
+  static String get googleAuthUrl => '$baseUrl$apiVersion/auth/mobile/google';
+
+  // Google OAuth web client ID (must match GOOGLE_CLIENT_ID in backend .env)
+  static const String googleClientId = String.fromEnvironment(
+    'GOOGLE_CLIENT_ID',
+    defaultValue: '',
+  );
 
   // Profile endpoints
   static String get profilesUrl => '$baseUrl$apiVersion/profiles';

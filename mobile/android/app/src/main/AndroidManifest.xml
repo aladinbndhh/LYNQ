@@ -45,5 +45,9 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Required for Google Sign-In -->
+        <intent>
+            <action android:name="com.google.android.gms.auth.account.GOOGLE_SIGN_IN"/>
+        </intent>
     </queries>
 </manifest>

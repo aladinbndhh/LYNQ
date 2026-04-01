@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../config/api_config.dart';
 
 class AuthService {
@@ -10,11 +11,24 @@ class AuthService {
   final Dio _dio;
   final FlutterSecureStorage _storage;
 
+  // Google Sign-In instance — serverClientId is needed to get an ID token
+  // that the backend can verify via Google's tokeninfo endpoint.
+  late final GoogleSignIn _googleSignIn;
+
   AuthService({Dio? dio, FlutterSecureStorage? storage})
       : _dio = dio ?? Dio(),
-        _storage = storage ?? const FlutterSecureStorage();
+        _storage = storage ?? const FlutterSecureStorage() {
+    _googleSignIn = GoogleSignIn(
+      serverClientId: ApiConfig.googleClientId.isNotEmpty
+          ? ApiConfig.googleClientId
+          : null,
+      scopes: ['email', 'profile'],
+    );
+  }
 
-  /// Login and persist JWT token
+  // ── Email / Password ────────────────────────────────────────────────────────
+
+  /// Login with email + password and persist JWT token
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await _dio.post(
       ApiConfig.loginUrl,
@@ -22,12 +36,7 @@ class AuthService {
     );
 
     if (response.data['success'] == true) {
-      final token = response.data['data']['token'] as String;
-      final userData = response.data['data']['user'] as Map<String, dynamic>;
-
-      await _storage.write(key: _tokenKey, value: token);
-      await _storage.write(key: _userKey, value: jsonEncode(userData));
-
+      await _persistSession(response.data['data']);
       return response.data['data'];
     } else {
       throw Exception(response.data['error'] ?? 'Login failed');
@@ -80,6 +89,61 @@ class AuthService {
     }
   }
 
+  // ── Google Sign-In ──────────────────────────────────────────────────────────
+
+  /// Sign in with Google and exchange the ID token for a LynQ JWT.
+  /// Returns the session data map on success.
+  Future<Map<String, dynamic>> loginWithGoogle() async {
+    // Trigger the Google account picker
+    final googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) {
+      throw Exception('Google sign-in cancelled');
+    }
+
+    // Get the auth tokens (includes idToken)
+    final googleAuth = await googleUser.authentication;
+    final idToken = googleAuth.idToken;
+
+    if (idToken == null) {
+      // Sign out of Google so the user can try again cleanly
+      await _googleSignIn.signOut();
+      throw Exception(
+        'Could not get Google ID token.\n'
+        'Make sure your Google Cloud OAuth client is configured correctly.',
+      );
+    }
+
+    // Exchange with LynQ backend
+    final response = await _dio.post(
+      ApiConfig.googleAuthUrl,
+      data: {'idToken': idToken},
+    );
+
+    if (response.data['success'] == true) {
+      await _persistSession(response.data['data']);
+      return response.data['data'];
+    } else {
+      await _googleSignIn.signOut();
+      throw Exception(response.data['error'] ?? 'Google sign-in failed');
+    }
+  }
+
+  /// Disconnect Google account on logout
+  Future<void> _disconnectGoogle() async {
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
+  }
+
+  // ── Session helpers ─────────────────────────────────────────────────────────
+
+  Future<void> _persistSession(Map<String, dynamic> data) async {
+    final token = data['token'] as String;
+    final userData = data['user'] as Map<String, dynamic>;
+    await _storage.write(key: _tokenKey, value: token);
+    await _storage.write(key: _userKey, value: jsonEncode(userData));
+  }
+
   /// Get stored JWT token
   Future<String?> getToken() => _storage.read(key: _tokenKey);
 
@@ -100,10 +164,13 @@ class AuthService {
     return token != null && token.isNotEmpty;
   }
 
-  /// Logout — clear stored credentials
+  /// Logout — clear stored credentials and disconnect Google
   Future<void> logout() async {
-    await _storage.delete(key: _tokenKey);
-    await _storage.delete(key: _userKey);
+    await Future.wait([
+      _storage.delete(key: _tokenKey),
+      _storage.delete(key: _userKey),
+      _disconnectGoogle(),
+    ]);
   }
 
   /// Build auth headers for API calls

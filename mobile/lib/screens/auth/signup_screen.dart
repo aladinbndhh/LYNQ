@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
+import 'login_screen.dart' show _GoogleButton, _Divider;
 
 class SignupScreen extends StatefulWidget {
   final VoidCallback onSignupSuccess;
@@ -33,6 +34,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Timer? _cooldownTimer;
 
   bool _loading = false;
+  bool _googleLoading = false;
   String? _error;
 
   @override
@@ -57,6 +59,22 @@ class _SignupScreenState extends State<SignupScreen> {
         if (mounted) setState(() => _resendCooldown--);
       }
     });
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() { _googleLoading = true; _error = null; });
+    try {
+      final auth = context.read<AuthService>();
+      await auth.loginWithGoogle();
+      widget.onSignupSuccess();
+    } catch (e) {
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      if (msg != 'Google sign-in cancelled') {
+        setState(() => _error = msg);
+      }
+    } finally {
+      if (mounted) setState(() => _googleLoading = false);
+    }
   }
 
   Future<void> _submitSignup() async {
@@ -141,6 +159,16 @@ class _SignupScreenState extends State<SignupScreen> {
           const Text('Start sharing your digital business card', style: TextStyle(fontSize: 15, color: Color(0xFF64748B))),
           const SizedBox(height: 28),
 
+          // Google Sign-In
+          _GoogleButton(
+            loading: _googleLoading,
+            onTap: (_loading || _googleLoading) ? null : _signInWithGoogle,
+          ),
+
+          const SizedBox(height: 24),
+          _Divider(),
+          const SizedBox(height: 24),
+
           if (_error != null) ...[
             _errorBanner(_error!),
             const SizedBox(height: 16),
@@ -159,7 +187,7 @@ class _SignupScreenState extends State<SignupScreen> {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: _loading ? null : _submitSignup,
+                    onPressed: (_loading || _googleLoading) ? null : _submitSignup,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF3B82F6),
                 foregroundColor: Colors.white,
