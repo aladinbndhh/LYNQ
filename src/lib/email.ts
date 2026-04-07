@@ -159,3 +159,39 @@ export async function sendWelcomeEmail(email: string, name: string) {
     html,
   });
 }
+
+// ─── Organisation invitation ─────────────────────────────────────────────────
+export async function sendOrgInvitationEmail(
+  email: string,
+  orgName: string,
+  roleLabel: string,
+  inviteUrl: string
+) {
+  const html = layout(`
+    <div style="padding:40px 40px 32px;">
+      <h1 style="margin:0 0 8px;font-size:24px;font-weight:800;color:#f1f5f9;">You're invited</h1>
+      <p style="margin:0 0 24px;font-size:15px;color:#94a3b8;line-height:1.6;">
+        <strong style="color:#e2e8f0;">${orgName}</strong> invited you to join their organisation on LynQ as <strong style="color:#e2e8f0;">${roleLabel}</strong>.
+      </p>
+      <table cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:10px;">
+            <a href="${inviteUrl}" style="display:inline-block;padding:14px 32px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;">
+              Accept invitation →
+            </a>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:24px 0 0;font-size:12px;color:#475569;line-height:1.6;">
+        This link expires in 7 days. If you didn't expect this, you can ignore this email.
+      </p>
+    </div>
+  `);
+
+  return resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: `Invitation to join ${orgName} on LynQ`,
+    html,
+  });
+}

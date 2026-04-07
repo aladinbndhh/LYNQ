@@ -16,6 +16,14 @@ const TenantSchema = new Schema<ITenant>(
       trim: true,
       index: true,
     },
+    subdomain: {
+      type: String,
+      sparse: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
     subscriptionTier: {
       type: String,
       enum: ['free', 'solo', 'business'],

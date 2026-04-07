@@ -7,3 +7,4 @@ export { default as Lead } from './lead';
 export { default as Meeting } from './meeting';
 export { default as Analytics } from './analytics';
 export { default as Otp } from './otp';
+export { default as Invitation } from './invitation';

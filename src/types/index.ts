@@ -8,6 +8,8 @@ export interface ITenant {
   _id: ObjectId;
   name: string;
   email: string;
+  /** Public org URL: {subdomain}.lynq.cards — set by org admin */
+  subdomain?: string;
   subscriptionTier: 'free' | 'solo' | 'business';
   userCount: number;          // seats licensed (business plan)
   aiUsageLimit: number;
@@ -198,6 +200,7 @@ export interface SessionUser {
   name: string;
   tenantId: string;
   role: 'admin' | 'user';
+  tenantSubdomain?: string | null;
 }
 
 export interface Session {

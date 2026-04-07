@@ -10,6 +10,8 @@ declare module 'next-auth' {
       tenantId: string;
       role: 'admin' | 'user';
       image?: string | null;
+      /** Org subdomain when configured (e.g. acme → acme.lynq.cards) */
+      tenantSubdomain?: string | null;
     };
   }
 
@@ -31,5 +33,6 @@ declare module 'next-auth/jwt' {
     tenantId: string;
     role: 'admin' | 'user';
     picture?: string;
+    tenantSubdomain?: string | null;
   }
 }

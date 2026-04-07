@@ -7,7 +7,7 @@ import { signOut } from 'next-auth/react';
 import {
   Settings, Zap, LogOut, ChevronDown,
   LayoutDashboard, Users, BarChart3, CalendarCheck,
-  CreditCard, Mail, Menu, X,
+  CreditCard, Mail, Menu, X, Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +15,7 @@ interface DashboardNavProps {
   userName: string;
   userEmail?: string;
   userAvatar?: string;
+  userRole?: 'admin' | 'user';
 }
 
 const NAV_ITEMS = [
@@ -26,7 +27,12 @@ const NAV_ITEMS = [
   { label: 'Email Sig', href: '/dashboard/email-signature', icon: Mail },
 ];
 
-export function DashboardNav({ userName, userEmail, userAvatar }: DashboardNavProps) {
+export function DashboardNav({ userName, userEmail, userAvatar, userRole }: DashboardNavProps) {
+  const orgNav =
+    userRole === 'admin'
+      ? [{ label: 'Organisation', href: '/dashboard/organization', icon: Building2 }]
+      : [];
+  const navItems = [...NAV_ITEMS, ...orgNav];
   const pathname = usePathname();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -48,7 +54,7 @@ export function DashboardNav({ userName, userEmail, userAvatar }: DashboardNavPr
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-0.5 flex-1 justify-center">
-          {NAV_ITEMS.map(({ label, href, icon: Icon }) => (
+          {navItems.map(({ label, href, icon: Icon }) => (
             <Link
               key={href}
               href={href}
@@ -149,7 +155,7 @@ export function DashboardNav({ userName, userEmail, userAvatar }: DashboardNavPr
       {/* Mobile nav drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-border bg-card px-4 py-3 space-y-1">
-          {[...NAV_ITEMS, { label: 'Billing', href: '/dashboard/billing', icon: Zap }, { label: 'Settings', href: '/dashboard/settings', icon: Settings }].map(
+          {[...navItems, { label: 'Billing', href: '/dashboard/billing', icon: Zap }, { label: 'Settings', href: '/dashboard/settings', icon: Settings }].map(
             ({ label, href, icon: Icon }) => (
               <Link
                 key={href}

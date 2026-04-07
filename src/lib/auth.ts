@@ -5,6 +5,16 @@ import connectDB from '@/lib/db/connection';
 import { User, Tenant, Profile } from '@/lib/db/models';
 import { verifyPassword, hashPassword } from '@/lib/utils/auth';
 
+async function fetchTenantSubdomain(tenantId: string): Promise<string | null> {
+  try {
+    await connectDB();
+    const t = await Tenant.findById(tenantId).select('subdomain').lean();
+    return (t as { subdomain?: string } | null)?.subdomain ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Generate a unique username from a display name / email prefix */
 async function generateUsername(base: string): Promise<string> {
   const sanitized = base
@@ -190,6 +200,10 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax' as const,
         path: '/',
         secure: process.env.NODE_ENV === 'production',
+        // Share session across org subdomains (e.g. acme.lynq.cards)
+        ...(process.env.NEXTAUTH_COOKIE_DOMAIN
+          ? { domain: process.env.NEXTAUTH_COOKIE_DOMAIN }
+          : {}),
         // No maxAge / expires → becomes a session cookie
         // Browser deletes it when the window/tab is closed
       },
@@ -253,6 +267,12 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
+      if (token.tenantId) {
+        if (user || token.tenantSubdomain === undefined) {
+          token.tenantSubdomain = await fetchTenantSubdomain(token.tenantId as string);
+        }
+      }
+
       return token;
     },
 
@@ -263,6 +283,8 @@ export const authOptions: NextAuthOptions = {
         session.user.name = token.name as string;
         session.user.tenantId = token.tenantId as string;
         session.user.role = token.role as 'admin' | 'user';
+        session.user.tenantSubdomain =
+          token.tenantSubdomain === undefined ? null : token.tenantSubdomain;
         // Pass avatar (Google profile picture)
         if (token.picture) {
           (session.user as any).image = token.picture;

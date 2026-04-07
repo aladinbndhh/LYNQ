@@ -17,6 +17,7 @@ export default async function DashboardLayout({
         userName={session.user.name || 'User'}
         userEmail={session.user.email || undefined}
         userAvatar={(session.user as any).image || undefined}
+        userRole={session.user.role}
       />
       {children}
     </div>
