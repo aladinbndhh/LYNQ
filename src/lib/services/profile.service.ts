@@ -49,14 +49,22 @@ export class ProfileService {
   }
 
   /**
-   * List all profiles for tenant
+   * List profiles for tenant.
+   * Admins see every card in the org; members only see their own.
    */
   static async listProfiles(tenantContext: TenantContext): Promise<IProfile[]> {
-    return Profile.find({ tenantId: tenantContext.tenantId }).sort({ createdAt: -1 });
+    const filter: Record<string, unknown> = { tenantId: tenantContext.tenantId };
+
+    if (!tenantContext.isAdmin()) {
+      filter.userId = tenantContext.user.id;
+    }
+
+    return Profile.find(filter).sort({ createdAt: -1 });
   }
 
   /**
-   * Update profile
+   * Update profile.
+   * Members may only update their own cards; admins may update any card in the tenant.
    */
   static async updateProfile(
     profileId: string,
@@ -74,27 +82,26 @@ export class ProfileService {
       data.qrCode = await this.generateQRCode(data.username);
     }
 
-    return Profile.findOneAndUpdate(
-      {
-        _id: profileId,
-        tenantId: tenantContext.tenantId,
-      },
-      { $set: data },
-      { new: true }
-    );
+    const ownershipFilter = tenantContext.isAdmin()
+      ? { _id: profileId, tenantId: tenantContext.tenantId }
+      : { _id: profileId, tenantId: tenantContext.tenantId, userId: tenantContext.user.id };
+
+    return Profile.findOneAndUpdate(ownershipFilter, { $set: data }, { new: true });
   }
 
   /**
-   * Delete profile
+   * Delete profile.
+   * Members may only delete their own cards; admins may delete any card in the tenant.
    */
   static async deleteProfile(
     profileId: string,
     tenantContext: TenantContext
   ): Promise<boolean> {
-    const result = await Profile.deleteOne({
-      _id: profileId,
-      tenantId: tenantContext.tenantId,
-    });
+    const ownershipFilter = tenantContext.isAdmin()
+      ? { _id: profileId, tenantId: tenantContext.tenantId }
+      : { _id: profileId, tenantId: tenantContext.tenantId, userId: tenantContext.user.id };
+
+    const result = await Profile.deleteOne(ownershipFilter);
     return result.deletedCount > 0;
   }
 
