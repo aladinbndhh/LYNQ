@@ -3,6 +3,7 @@ import Image from 'next/image';
 import connectDB from '@/lib/db/connection';
 import { ProfileService } from '@/lib/services/profile.service';
 import { ModernChatWidget } from '@/components/ui/modern-chat-widget';
+import { SaveContactModal } from '@/components/ui/save-contact-modal';
 
 interface ProfilePageProps {
   params: Promise<{ username: string }>;
@@ -239,15 +240,12 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
               }}>
               📅 Book a Meeting
             </a>
-            <a href={`/api/contact/${profile.username}`} download={`${profile.username}.vcf`}
-              style={{
-                display: 'block', width: '100%', padding: '14px', borderRadius: '14px',
-                background: chipBg, color: textColor,
-                textAlign: 'center', textDecoration: 'none',
-                fontSize: '15px', fontWeight: 600, boxSizing: 'border-box',
-              }}>
-              👤 Save Contact
-            </a>
+            <SaveContactModal
+              username={profile.username}
+              ownerName={profile.displayName}
+              primaryColor={primaryColor}
+              isDark={isDark}
+            />
           </div>
         </div>
 
