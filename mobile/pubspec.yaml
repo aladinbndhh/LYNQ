@@ -59,7 +59,11 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
+  # Android – transparent logo is fine (adaptive icon handles the bg)
   image_path: "assets/images/logo.png"
   min_sdk_android: 21
   adaptive_icon_background: "#0F172A"
   adaptive_icon_foreground: "assets/images/logo.png"
+  # iOS – must use a solid-background, no-alpha PNG (Apple requirement)
+  image_path_ios: "assets/images/logo_ios.png"
+  remove_alpha_ios: true
