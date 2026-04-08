@@ -43,6 +43,16 @@
 	</array>
 	<key>NSContactsUsageDescription</key>
 	<string>LynQ needs access to your contacts to save leads directly to your address book.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>LynQ needs camera access to scan QR codes and take profile photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>LynQ needs access to your photo library to set your profile and card images.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>LynQ needs permission to save images to your photo library.</string>
+	<key>NFCReaderUsageDescription</key>
+	<string>LynQ uses NFC to share your digital business card with a tap.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
