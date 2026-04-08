@@ -91,7 +91,7 @@ export async function POST(
       email:     email.trim().toLowerCase(),
       phone:     phone?.trim() || undefined,
       company:   company?.trim() || undefined,
-      source:    'card',
+      source:    'link',
       status:    'new',
     });
 
