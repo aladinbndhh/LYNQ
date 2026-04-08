@@ -22,7 +22,6 @@ dependencies:
   # QR code scanning
   mobile_scanner: ^5.2.3
   # NFC (read/write)
-  flutter_nfc_kit: ^3.4.1
   # Image picker (avatar upload)
   image_picker: ^1.1.2
   # Share card URL
