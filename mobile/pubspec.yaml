@@ -40,8 +40,8 @@ dependencies:
   flutter_animate: ^4.5.0
   # Deep link handling (for Google OAuth callback)
   app_links: ^6.3.4
-  # Native contacts (Android ContactsContract / iOS CNContactStore)
-  flutter_contacts: ^1.1.9+2
+  # Temp file path for vCard export
+  path_provider: ^2.1.4
 
 dev_dependencies:
   flutter_test:

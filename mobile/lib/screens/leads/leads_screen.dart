@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/lead_model.dart';
 import '../../services/lead_service.dart';
@@ -284,36 +286,33 @@ class _LeadDetailSheetState extends State<_LeadDetailSheet> {
   Future<void> _saveToContacts() async {
     setState(() => _saving = true);
     try {
-      // Request permission
-      final granted = await FlutterContacts.requestPermission();
-      if (!granted) {
-        if (mounted) {
-          _showSnack('Contacts permission denied. Please enable it in Settings.', isError: true);
-        }
-        return;
-      }
+      final lead = widget.lead;
 
-      // Build contact
-      final contact = Contact()
-        ..name = Name(first: _firstName, last: _lastName)
-        ..organizations = widget.lead.company != null
-            ? [Organization(company: widget.lead.company!)]
-            : []
-        ..phones = widget.lead.phone != null
-            ? [Phone(widget.lead.phone!, label: PhoneLabel.mobile)]
-            : []
-        ..emails = widget.lead.email != null
-            ? [Email(widget.lead.email!, label: EmailLabel.work)]
-            : [];
+      // Build vCard string
+      final vcf = StringBuffer()
+        ..writeln('BEGIN:VCARD')
+        ..writeln('VERSION:3.0')
+        ..writeln('FN:${lead.name}')
+        ..writeln('N:$_lastName;$_firstName;;;');
+      if (lead.company != null) vcf.writeln('ORG:${lead.company}');
+      if (lead.email != null)   vcf.writeln('EMAIL;TYPE=WORK:${lead.email}');
+      if (lead.phone != null)   vcf.writeln('TEL;TYPE=CELL:${lead.phone}');
+      vcf.writeln('END:VCARD');
 
-      await FlutterContacts.insertContact(contact);
+      // Write to temp file
+      final dir  = await getTemporaryDirectory();
+      final safe = lead.name.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      final file = File('${dir.path}/$safe.vcf');
+      await file.writeAsString(vcf.toString());
 
-      if (mounted) {
-        _showSnack('${widget.lead.name} saved to contacts!');
-      }
+      // Share — iOS shows native "Add to Contacts", Android opens contacts app
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'text/vcard')],
+        subject: lead.name,
+      );
     } catch (e) {
       if (mounted) {
-        _showSnack('Failed to save contact: ${e.toString().replaceFirst("Exception: ", "")}', isError: true);
+        _showSnack('Failed to export contact: ${e.toString().replaceFirst("Exception: ", "")}', isError: true);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
