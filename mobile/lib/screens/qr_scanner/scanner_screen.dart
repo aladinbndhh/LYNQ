@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../theme/app_theme.dart';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -46,16 +47,16 @@ class _ScannerScreenState extends State<ScannerScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        decoration: const BoxDecoration(color: DarkColors.surface, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         padding: const EdgeInsets.all(24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(2))),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: DarkColors.border, borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 20),
-          const Icon(Icons.qr_code_scanner, size: 48, color: Color(0xFF3B82F6)),
+          const Icon(Icons.qr_code_scanner, size: 48, color: DarkColors.primary),
           const SizedBox(height: 12),
-          const Text('QR Code Scanned', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
+          const Text('QR Code Scanned', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: DarkColors.textPrimary)),
           const SizedBox(height: 8),
-          Text(url, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)), maxLines: 3, overflow: TextOverflow.ellipsis),
+          Text(url, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: DarkColors.textSecondary), maxLines: 3, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 24),
           Row(children: [
             Expanded(
@@ -66,7 +67,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 13),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
                 ),
               ),
             ),
@@ -83,10 +83,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
                 label: const Text('Open'),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 13),
-                  backgroundColor: const Color(0xFF3B82F6),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
                 ),
               ),
             ),
@@ -98,7 +94,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
               setState(() => _scannedUrl = null);
               _controller?.start();
             },
-            child: const Text('Scan Again', style: TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.w600)),
+            child: const Text('Scan Again', style: TextStyle(color: DarkColors.primary, fontWeight: FontWeight.w600)),
           ),
         ]),
       ),

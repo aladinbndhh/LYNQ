@@ -62,6 +62,7 @@ export interface IProfile {
   branding: {
     primaryColor: string;
     logo: string;
+    bannerUrl?: string;
     customDomain?: string;
     theme?: 'light' | 'dark' | 'gradient' | 'glass' | 'neon';
     backgroundImage?: string;

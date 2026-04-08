@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 /// "Continue with Google" outlined button with built-in loading state.
 class GoogleSignInButton extends StatelessWidget {
@@ -15,10 +16,10 @@ class GoogleSignInButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: loading ? null : onTap,
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+          side: const BorderSide(color: DarkColors.border2, width: 1.5),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF1E293B),
+          backgroundColor: DarkColors.elevated,
+          foregroundColor: DarkColors.textPrimary,
         ),
         child: loading
             ? const SizedBox(
@@ -26,7 +27,7 @@ class GoogleSignInButton extends StatelessWidget {
                 height: 22,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Color(0xFF3B82F6),
+                  color: DarkColors.primary,
                 ),
               )
             : const Row(
@@ -39,7 +40,7 @@ class GoogleSignInButton extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B),
+                      color: DarkColors.textPrimary,
                     ),
                   ),
                 ],
@@ -56,24 +57,24 @@ class OrDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(children: [
-      const Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
+      const Expanded(child: Divider(color: DarkColors.border, thickness: 1)),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Text(
           'or',
           style: TextStyle(
-            color: Colors.grey.shade400,
+            color: DarkColors.textMuted,
             fontSize: 13,
             fontWeight: FontWeight.w500,
           ),
         ),
       ),
-      const Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
+      const Expanded(child: Divider(color: DarkColors.border, thickness: 1)),
     ]);
   }
 }
 
-/// Draws the Google multicolour "G" with CustomPaint — no image asset needed.
+/// Google multicolour "G" drawn with CustomPaint.
 class GoogleLogo extends StatelessWidget {
   final double size;
   const GoogleLogo({super.key, required this.size});
@@ -97,8 +98,7 @@ class _GoogleLogoPainter extends CustomPainter {
 
     canvas.clipPath(
         Path()..addOval(Rect.fromCircle(center: Offset(cx, cy), radius: r)));
-    canvas.drawCircle(
-        Offset(cx, cy), r, Paint()..color = Colors.white);
+    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = Colors.white);
 
     const deg = 3.14159265 / 180;
     final arcR = r * 0.79;
@@ -121,7 +121,6 @@ class _GoogleLogoPainter extends CustomPainter {
       canvas.drawArc(arcRect, start * deg, sweep * deg, false, arcPaint);
     }
 
-    // White horizontal bar — creates the flat edge of the "G"
     canvas.drawLine(
       Offset(cx, cy),
       Offset(cx + arcR, cy),
@@ -131,7 +130,6 @@ class _GoogleLogoPainter extends CustomPainter {
         ..strokeCap = StrokeCap.butt,
     );
 
-    // Inner white circle — creates the ring shape
     canvas.drawCircle(
         Offset(cx, cy), arcR - r * 0.21, Paint()..color = Colors.white);
   }

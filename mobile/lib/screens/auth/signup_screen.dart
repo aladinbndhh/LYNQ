@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/google_auth_widgets.dart';
 
@@ -8,11 +9,7 @@ class SignupScreen extends StatefulWidget {
   final VoidCallback onSignupSuccess;
   final VoidCallback onGoLogin;
 
-  const SignupScreen({
-    super.key,
-    required this.onSignupSuccess,
-    required this.onGoLogin,
-  });
+  const SignupScreen({super.key, required this.onSignupSuccess, required this.onGoLogin});
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -25,7 +22,6 @@ class _SignupScreenState extends State<SignupScreen> {
   final _companyCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
 
-  // OTP step state
   bool _otpStep = false;
   String _pendingEmail = '';
   String _pendingPassword = '';
@@ -35,6 +31,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool _loading = false;
   bool _googleLoading = false;
+  bool _obscure = true;
   String? _error;
 
   @override
@@ -64,14 +61,11 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _signInWithGoogle() async {
     setState(() { _googleLoading = true; _error = null; });
     try {
-      final auth = context.read<AuthService>();
-      await auth.loginWithGoogle();
+      await context.read<AuthService>().loginWithGoogle();
       widget.onSignupSuccess();
     } catch (e) {
       final msg = e.toString().replaceFirst('Exception: ', '');
-      if (msg != 'Google sign-in cancelled') {
-        setState(() => _error = msg);
-      }
+      if (msg != 'Google sign-in cancelled') setState(() => _error = msg);
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
@@ -81,8 +75,7 @@ class _SignupScreenState extends State<SignupScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final auth = context.read<AuthService>();
-      await auth.signup(
+      await context.read<AuthService>().signup(
         name: _nameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
@@ -91,9 +84,9 @@ class _SignupScreenState extends State<SignupScreen> {
       _pendingEmail = _emailCtrl.text.trim();
       _pendingPassword = _passwordCtrl.text;
       _startCooldown(60);
-      setState(() { _otpStep = true; });
+      setState(() => _otpStep = true);
     } catch (e) {
-      setState(() { _error = e.toString().replaceFirst('Exception: ', ''); });
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -112,7 +105,7 @@ class _SignupScreenState extends State<SignupScreen> {
       await auth.login(_pendingEmail, _pendingPassword);
       widget.onSignupSuccess();
     } catch (e) {
-      setState(() { _error = e.toString().replaceFirst('Exception: ', ''); });
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -122,11 +115,10 @@ class _SignupScreenState extends State<SignupScreen> {
     if (_resendCooldown > 0) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final auth = context.read<AuthService>();
-      await auth.resendOtp(email: _pendingEmail);
+      await context.read<AuthService>().resendOtp(email: _pendingEmail);
       _startCooldown(60);
     } catch (e) {
-      setState(() { _error = e.toString().replaceFirst('Exception: ', ''); });
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -135,11 +127,19 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
-          child: _otpStep ? _buildOtpStep() : _buildSignupForm(),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF060D1A), Color(0xFF0D1526), Color(0xFF060D1A)],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(28, 40, 28, 28),
+            child: _otpStep ? _buildOtpStep() : _buildSignupForm(),
+          ),
         ),
       ),
     );
@@ -151,62 +151,81 @@ class _SignupScreenState extends State<SignupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 32),
-          Image.asset('assets/images/logo.png', width: 72, height: 72),
-          const SizedBox(height: 24),
-          const Text('Create account', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
-          const SizedBox(height: 6),
-          const Text('Start sharing your digital business card', style: TextStyle(fontSize: 15, color: Color(0xFF64748B))),
-          const SizedBox(height: 28),
+          Row(children: [
+            Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                gradient: const LinearGradient(colors: [DarkColors.gradient1, DarkColors.gradient2]),
+              ),
+              padding: const EdgeInsets.all(8),
+              child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
+            ),
+            const SizedBox(width: 12),
+            const Text('LynQ', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: DarkColors.textPrimary, letterSpacing: -0.5)),
+          ]),
+          const SizedBox(height: 40),
 
-          // Google Sign-In
+          const Text('Create account', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: DarkColors.textPrimary, letterSpacing: -0.5)),
+          const SizedBox(height: 6),
+          const Text('Start sharing your digital business card', style: TextStyle(fontSize: 15, color: DarkColors.textSecondary)),
+          const SizedBox(height: 32),
+
           GoogleSignInButton(
             loading: _googleLoading,
             onTap: (_loading || _googleLoading) ? null : _signInWithGoogle,
           ),
-
           const SizedBox(height: 24),
           const OrDivider(),
           const SizedBox(height: 24),
 
           if (_error != null) ...[
-            _errorBanner(_error!),
-            const SizedBox(height: 16),
+            _ErrorBanner(message: _error!),
+            const SizedBox(height: 20),
           ],
 
-          _field('Full Name', _nameCtrl, validator: (v) => v == null || v.isEmpty ? 'Required' : null),
-          const SizedBox(height: 12),
-          _field('Email', _emailCtrl, keyboardType: TextInputType.emailAddress, validator: (v) => v == null || !v.contains('@') ? 'Enter valid email' : null),
-          const SizedBox(height: 12),
-          _field('Company Name', _companyCtrl, validator: (v) => v == null || v.isEmpty ? 'Required' : null),
-          const SizedBox(height: 12),
-          _field('Password', _passwordCtrl, obscure: true, validator: (v) => v == null || v.length < 6 ? 'Min 6 characters' : null),
-          const SizedBox(height: 24),
+          _DarkField(label: 'Full Name', controller: _nameCtrl,
+              validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+          const SizedBox(height: 16),
+          _DarkField(label: 'Email', controller: _emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              validator: (v) => v == null || !v.contains('@') ? 'Enter a valid email' : null),
+          const SizedBox(height: 16),
+          _DarkField(label: 'Company Name', controller: _companyCtrl,
+              validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+          const SizedBox(height: 16),
+          _DarkField(
+            label: 'Password',
+            controller: _passwordCtrl,
+            obscure: _obscure,
+            suffix: IconButton(
+              icon: Icon(
+                _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                size: 20, color: DarkColors.textMuted,
+              ),
+              onPressed: () => setState(() => _obscure = !_obscure),
+            ),
+            validator: (v) => v == null || v.length < 6 ? 'Minimum 6 characters' : null,
+          ),
+          const SizedBox(height: 28),
 
           SizedBox(
-            width: double.infinity,
-            height: 52,
+            width: double.infinity, height: 54,
             child: ElevatedButton(
-                    onPressed: (_loading || _googleLoading) ? null : _submitSignup,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3B82F6),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                elevation: 0,
-              ),
+              onPressed: (_loading || _googleLoading) ? null : _submitSignup,
               child: _loading
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Create Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Create Account'),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           Center(
             child: TextButton(
               onPressed: widget.onGoLogin,
               child: const Text.rich(TextSpan(children: [
-                TextSpan(text: 'Already have an account? ', style: TextStyle(color: Color(0xFF64748B))),
-                TextSpan(text: 'Sign in', style: TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.w600)),
+                TextSpan(text: 'Already have an account? ', style: TextStyle(color: DarkColors.textSecondary)),
+                TextSpan(text: 'Sign in', style: TextStyle(color: DarkColors.primary, fontWeight: FontWeight.w600)),
               ])),
             ),
           ),
@@ -219,113 +238,149 @@ class _SignupScreenState extends State<SignupScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 32),
-        Image.asset('assets/images/logo.png', width: 72, height: 72),
+        // Back button
+        GestureDetector(
+          onTap: () => setState(() { _otpStep = false; _error = null; }),
+          child: const Row(children: [
+            Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: DarkColors.textSecondary),
+            SizedBox(width: 4),
+            Text('Back to sign up', style: TextStyle(color: DarkColors.textSecondary, fontSize: 14)),
+          ]),
+        ),
+        const SizedBox(height: 40),
+
+        // Icon
+        Container(
+          width: 72, height: 72,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [DarkColors.gradient1, DarkColors.gradient2]),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Icon(Icons.mark_email_unread_outlined, color: Colors.white, size: 32),
+        ),
         const SizedBox(height: 24),
-        const Text('Check your email', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
-        const SizedBox(height: 6),
-        Text('We sent a 6-digit code to $_pendingEmail', style: const TextStyle(fontSize: 15, color: Color(0xFF64748B))),
-        const SizedBox(height: 28),
+
+        const Text('Check your email', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: DarkColors.textPrimary, letterSpacing: -0.5)),
+        const SizedBox(height: 8),
+        Text.rich(TextSpan(children: [
+          const TextSpan(text: 'We sent a 6-digit code to\n', style: TextStyle(fontSize: 15, color: DarkColors.textSecondary)),
+          TextSpan(text: _pendingEmail, style: const TextStyle(fontSize: 15, color: DarkColors.textPrimary, fontWeight: FontWeight.w600)),
+        ])),
+        const SizedBox(height: 32),
 
         if (_error != null) ...[
-          _errorBanner(_error!),
-          const SizedBox(height: 16),
+          _ErrorBanner(message: _error!),
+          const SizedBox(height: 20),
         ],
 
         // OTP field
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Verification Code', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
-          const SizedBox(height: 4),
+          const Text('Verification Code', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: DarkColors.textSecondary, letterSpacing: 0.3)),
+          const SizedBox(height: 8),
           TextField(
             controller: _otpCtrl,
             keyboardType: TextInputType.number,
             maxLength: 6,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: 8),
+            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: 12, color: DarkColors.textPrimary),
             decoration: InputDecoration(
               counterText: '',
-              filled: true, fillColor: Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 2)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              filled: true,
+              fillColor: DarkColors.elevated,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: DarkColors.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: DarkColors.border)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: DarkColors.primary, width: 2)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               hintText: '000000',
-              hintStyle: const TextStyle(color: Color(0xFFCBD5E1), letterSpacing: 8),
+              hintStyle: const TextStyle(color: DarkColors.textMuted, fontSize: 28, letterSpacing: 12),
             ),
           ),
         ]),
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
 
         SizedBox(
-          width: double.infinity,
-          height: 52,
+          width: double.infinity, height: 54,
           child: ElevatedButton(
             onPressed: _loading ? null : _verifyOtp,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3B82F6),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              elevation: 0,
-            ),
             child: _loading
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Verify Email', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Verify Email'),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
 
         Center(
           child: _resendCooldown > 0
-              ? Text('Resend code in ${_resendCooldown}s', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14))
+              ? Text('Resend code in ${_resendCooldown}s',
+                  style: const TextStyle(color: DarkColors.textMuted, fontSize: 14))
               : TextButton(
                   onPressed: _loading ? null : _resendOtp,
-                  child: const Text('Resend code', style: TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.w600)),
+                  child: const Text('Resend code',
+                    style: TextStyle(color: DarkColors.primary, fontWeight: FontWeight.w600)),
                 ),
-        ),
-        const SizedBox(height: 8),
-        Center(
-          child: TextButton(
-            onPressed: () => setState(() { _otpStep = false; _error = null; }),
-            child: const Text('← Back to sign up', style: TextStyle(color: Color(0xFF64748B))),
-          ),
         ),
       ],
     );
   }
+}
 
-  Widget _errorBanner(String message) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFECACA)),
-      ),
-      child: Text(message, style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13)),
-    );
-  }
+// ── Shared dark widgets ────────────────────────────────────────────────────
 
-  Widget _field(String label, TextEditingController ctrl, {
-    TextInputType? keyboardType,
-    bool obscure = false,
-    String? Function(String?)? validator,
-  }) {
+class _DarkField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final TextInputType? keyboardType;
+  final bool obscure;
+  final Widget? suffix;
+  final String? Function(String?)? validator;
+  final int maxLines;
+
+  const _DarkField({
+    required this.label,
+    required this.controller,
+    this.keyboardType,
+    this.obscure = false,
+    this.suffix,
+    this.validator,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
-      const SizedBox(height: 4),
+      Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: DarkColors.textSecondary, letterSpacing: 0.3)),
+      const SizedBox(height: 6),
       TextFormField(
-        controller: ctrl,
+        controller: controller,
         keyboardType: keyboardType,
         obscureText: obscure,
         validator: validator,
-        decoration: InputDecoration(
-          filled: true, fillColor: Colors.white,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 2)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
+        maxLines: maxLines,
+        style: const TextStyle(color: DarkColors.textPrimary, fontSize: 14),
+        decoration: InputDecoration(suffixIcon: suffix),
       ),
     ]);
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: DarkColors.error.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: DarkColors.error.withOpacity(0.3)),
+      ),
+      child: Row(children: [
+        const Icon(Icons.error_outline, color: DarkColors.error, size: 16),
+        const SizedBox(width: 8),
+        Expanded(child: Text(message, style: const TextStyle(color: DarkColors.error, fontSize: 13))),
+      ]),
+    );
   }
 }

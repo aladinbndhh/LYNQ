@@ -60,6 +60,10 @@ const ProfileSchema = new Schema<IProfile>(
         type: String,
         default: '',
       },
+      bannerUrl: {
+        type: String,
+        default: '',
+      },
       customDomain: String,
       theme: {
         type: String,

@@ -1,12 +1,14 @@
 class BrandingModel {
   final String primaryColor;
-  final String? logo;
+  final String? logo;       // company logo URL
+  final String? bannerUrl;  // company banner image URL (cards + signatures)
   final String? customDomain;
   final String theme; // light | dark | gradient | glass | neon
 
   BrandingModel({
     this.primaryColor = '#3b82f6',
     this.logo,
+    this.bannerUrl,
     this.customDomain,
     this.theme = 'light',
   });
@@ -14,6 +16,7 @@ class BrandingModel {
   factory BrandingModel.fromJson(Map<String, dynamic> json) => BrandingModel(
         primaryColor: json['primaryColor'] ?? '#3b82f6',
         logo: json['logo'],
+        bannerUrl: json['bannerUrl'],
         customDomain: json['customDomain'],
         theme: json['theme'] ?? 'light',
       );
@@ -21,6 +24,7 @@ class BrandingModel {
   Map<String, dynamic> toJson() => {
         'primaryColor': primaryColor,
         if (logo != null) 'logo': logo,
+        if (bannerUrl != null) 'bannerUrl': bannerUrl,
         if (customDomain != null) 'customDomain': customDomain,
         'theme': theme,
       };
@@ -28,12 +32,14 @@ class BrandingModel {
   BrandingModel copyWith({
     String? primaryColor,
     String? logo,
+    String? bannerUrl,
     String? customDomain,
     String? theme,
   }) =>
       BrandingModel(
         primaryColor: primaryColor ?? this.primaryColor,
         logo: logo ?? this.logo,
+        bannerUrl: bannerUrl ?? this.bannerUrl,
         customDomain: customDomain ?? this.customDomain,
         theme: theme ?? this.theme,
       );

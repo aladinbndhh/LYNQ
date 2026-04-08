@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../config/api_config.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/google_auth_widgets.dart';
+import '../../theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -25,7 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(content: Text(e.toString()), backgroundColor: DarkColors.error),
         );
       }
     }
@@ -34,13 +35,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _connectGoogle() async {
     setState(() => _googleLoading = true);
     try {
-      final auth = context.read<AuthService>();
-      await auth.loginWithGoogle();
+      await context.read<AuthService>().loginWithGoogle();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Google account connected!'),
-            backgroundColor: Color(0xFF10B981),
+            backgroundColor: DarkColors.success,
           ),
         );
       }
@@ -48,7 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final msg = e.toString().replaceFirst('Exception: ', '');
       if (mounted && msg != 'Google sign-in cancelled') {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: const Color(0xFFEF4444)),
+          SnackBar(content: Text(msg), backgroundColor: DarkColors.error),
         );
       }
     } finally {
@@ -60,160 +60,137 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: const Text('Are you sure you want to sign out?'),
+        backgroundColor: DarkColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.w700, color: DarkColors.textPrimary)),
+        content: const Text('Are you sure you want to sign out?', style: TextStyle(color: DarkColors.textSecondary)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sign Out', style: TextStyle(color: Color(0xFFEF4444))),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel', style: TextStyle(color: DarkColors.textSecondary))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sign Out', style: TextStyle(color: DarkColors.error))),
         ],
       ),
     );
     if (confirm != true) return;
-    final auth = context.read<AuthService>();
-    await auth.logout();
+    if (!mounted) return;
+    await context.read<AuthService>().logout();
     widget.onLogout();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.w700)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1E293B),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _section('Account', [
-            _tile(Icons.person_outline, 'Profile', const Color(0xFF3B82F6), () {}),
+          _sectionLabel('ACCOUNT'),
+          _settingsCard([
+            _tile(Icons.person_outline, 'Profile', const Color(0xFF6366F1), () {}),
+            _divider(),
             _tile(Icons.credit_card_outlined, 'Billing & Plans', const Color(0xFF8B5CF6), _openBillingPortal),
           ]),
+          const SizedBox(height: 20),
 
-          const SizedBox(height: 16),
-
-          // Google Sign-In button — visible from inside the app
-          _googleLoading
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: CircularProgressIndicator(color: Color(0xFF3B82F6)),
-                  ),
-                )
-              : GoogleSignInButton(
-                  loading: _googleLoading,
-                  onTap: _connectGoogle,
-                ),
-
-          const SizedBox(height: 16),
-          _section('Integrations', [
-            _tile(Icons.calendar_today_outlined, 'Google Calendar', const Color(0xFF10B981), () {}),
-            _tile(Icons.mail_outline, 'Outlook Calendar', const Color(0xFF0EA5E9), () {}),
-            _tile(Icons.sync_outlined, 'Odoo CRM Sync', const Color(0xFFF59E0B), () {}, badge: 'Optional'),
-          ]),
-
-          const SizedBox(height: 16),
-          _section('About', [
-            _tile(
-              Icons.info_outline, 'App Version', const Color(0xFF94A3B8), () {},
-              trailing: const Text('1.0.0', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+          _sectionLabel('CONNECTED ACCOUNTS'),
+          _settingsCard([
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: GoogleSignInButton(loading: _googleLoading, onTap: _connectGoogle),
             ),
-            _tile(Icons.privacy_tip_outlined, 'Privacy Policy', const Color(0xFF64748B), () {}),
           ]),
+          const SizedBox(height: 20),
 
-          const SizedBox(height: 24),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFFECACA)),
-            ),
-            child: ListTile(
-              leading: const Icon(Icons.logout, color: Color(0xFFEF4444)),
-              title: const Text(
-                'Sign Out',
-                style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600),
+          _sectionLabel('INTEGRATIONS'),
+          _settingsCard([
+            _tile(Icons.calendar_today_outlined, 'Google Calendar', DarkColors.success, () {}),
+            _divider(),
+            _tile(Icons.mail_outline, 'Outlook Calendar', DarkColors.info, () {}),
+            _divider(),
+            _tile(Icons.sync_outlined, 'Odoo CRM', DarkColors.warning, () {}, badge: 'Optional'),
+          ]),
+          const SizedBox(height: 20),
+
+          _sectionLabel('ABOUT'),
+          _settingsCard([
+            _tile(Icons.info_outline, 'App Version', DarkColors.textMuted, () {},
+                trailing: const Text('1.0.0', style: TextStyle(color: DarkColors.textMuted, fontSize: 13))),
+            _divider(),
+            _tile(Icons.privacy_tip_outlined, 'Privacy Policy', DarkColors.textMuted, () {}),
+          ]),
+          const SizedBox(height: 28),
+
+          // Sign Out
+          GestureDetector(
+            onTap: _logout,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: DarkColors.error.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: DarkColors.error.withOpacity(0.25)),
               ),
-              onTap: _logout,
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.logout, color: DarkColors.error, size: 18),
+                  SizedBox(width: 10),
+                  Text('Sign Out', style: TextStyle(color: DarkColors.error, fontWeight: FontWeight.w700, fontSize: 15)),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
         ],
       ),
     );
   }
 
-  Widget _section(String title, List<Widget> tiles) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(
-        padding: const EdgeInsets.only(left: 4, bottom: 8),
-        child: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF94A3B8),
-            letterSpacing: 0.5,
-          ),
-        ),
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: DarkColors.textMuted, letterSpacing: 1.2),
       ),
-      Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6)],
-        ),
-        child: Column(children: tiles),
-      ),
-    ]);
+    );
   }
 
-  Widget _tile(
-    IconData icon,
-    String label,
-    Color color,
-    VoidCallback onTap, {
-    Widget? trailing,
-    String? badge,
-  }) {
+  Widget _settingsCard(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: DarkColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: DarkColors.border),
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _divider() {
+    return const Divider(height: 1, indent: 16, endIndent: 0, color: DarkColors.border);
+  }
+
+  Widget _tile(IconData icon, String label, Color color, VoidCallback onTap, {Widget? trailing, String? badge}) {
     return ListTile(
+      onTap: onTap,
       leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(10),
-        ),
+        width: 36, height: 36,
+        decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
         child: Icon(icon, color: color, size: 18),
       ),
-      title: Text(
-        label,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1E293B)),
-      ),
+      title: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: DarkColors.textPrimary)),
       trailing: trailing ??
           (badge != null
               ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(8),
+                    color: DarkColors.elevated,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: DarkColors.border),
                   ),
-                  child: Text(
-                    badge,
-                    style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-                  ),
+                  child: Text(badge, style: const TextStyle(fontSize: 10, color: DarkColors.textMuted, fontWeight: FontWeight.w600)),
                 )
-              : const Icon(Icons.chevron_right, color: Color(0xFFCBD5E1), size: 18)),
-      onTap: onTap,
+              : const Icon(Icons.chevron_right, color: DarkColors.border, size: 18)),
     );
   }
 }

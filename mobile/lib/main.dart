@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
 import 'services/profile_service.dart';
 import 'services/lead_service.dart';
@@ -13,6 +15,13 @@ import 'screens/qr_scanner/scanner_screen.dart';
 import 'screens/settings/settings_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Color(0xFF0D1526),
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
   runApp(const LynQApp());
 }
 
@@ -31,22 +40,9 @@ class LynQApp extends StatelessWidget {
       child: MaterialApp(
         title: 'LynQ',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF3B82F6),
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          fontFamily: 'SF Pro Display',
-          appBarTheme: const AppBarTheme(
-            centerTitle: false,
-            titleTextStyle: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF1E293B),
-            ),
-          ),
-        ),
+        theme: AppTheme.dark,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeMode.dark,
         home: const AppRoot(),
       ),
     );
@@ -61,14 +57,12 @@ class AppRoot extends StatefulWidget {
 }
 
 class _AppRootState extends State<AppRoot> {
-  // null = showing splash, true = logged in, false = logged out
   bool? _isLoggedIn;
   bool _showSignup = false;
   int _currentTab = 0;
 
   @override
   Widget build(BuildContext context) {
-    // Splash screen: passes auth future and handles completion
     if (_isLoggedIn == null) {
       final auth = context.read<AuthService>();
       return SplashScreen(
@@ -79,7 +73,6 @@ class _AppRootState extends State<AppRoot> {
       );
     }
 
-    // Auth screens
     if (_isLoggedIn == false) {
       return _showSignup
           ? SignupScreen(
@@ -95,7 +88,6 @@ class _AppRootState extends State<AppRoot> {
             );
     }
 
-    // Main app with bottom navigation
     final screens = [
       DashboardScreen(
         onNavigateToCards: () => setState(() => _currentTab = 1),
@@ -119,34 +111,30 @@ class _AppRootState extends State<AppRoot> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentTab,
         onDestinationSelected: (i) => setState(() => _currentTab = i),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        shadowColor: Colors.transparent,
-        indicatorColor: const Color(0xFF3B82F6).withOpacity(0.12),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home, color: Color(0xFF3B82F6)),
+            selectedIcon: Icon(Icons.home),
             label: 'Home',
           ),
           NavigationDestination(
             icon: Icon(Icons.credit_card_outlined),
-            selectedIcon: Icon(Icons.credit_card, color: Color(0xFF3B82F6)),
+            selectedIcon: Icon(Icons.credit_card),
             label: 'Cards',
           ),
           NavigationDestination(
             icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people, color: Color(0xFF3B82F6)),
+            selectedIcon: Icon(Icons.people),
             label: 'Leads',
           ),
           NavigationDestination(
             icon: Icon(Icons.qr_code_scanner_outlined),
-            selectedIcon: Icon(Icons.qr_code_scanner, color: Color(0xFF3B82F6)),
+            selectedIcon: Icon(Icons.qr_code_scanner),
             label: 'Scan',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings, color: Color(0xFF3B82F6)),
+            selectedIcon: Icon(Icons.settings),
             label: 'Settings',
           ),
         ],
