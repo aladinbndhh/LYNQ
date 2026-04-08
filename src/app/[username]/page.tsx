@@ -239,7 +239,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
               }}>
               📅 Book a Meeting
             </a>
-            <a href={cardUrl} download
+            <a href={`/api/contact/${profile.username}`} download={`${profile.username}.vcf`}
               style={{
                 display: 'block', width: '100%', padding: '14px', borderRadius: '14px',
                 background: chipBg, color: textColor,
