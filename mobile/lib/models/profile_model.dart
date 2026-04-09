@@ -13,13 +13,18 @@ class BrandingModel {
     this.theme = 'light',
   });
 
-  factory BrandingModel.fromJson(Map<String, dynamic> json) => BrandingModel(
-        primaryColor: json['primaryColor'] ?? '#3b82f6',
-        logo: json['logo'],
-        bannerUrl: json['bannerUrl'],
-        customDomain: json['customDomain'],
-        theme: json['theme'] ?? 'light',
-      );
+  factory BrandingModel.fromJson(dynamic raw) {
+    final json = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
+    final logo      = json['logo']?.toString();
+    final bannerUrl = json['bannerUrl']?.toString();
+    return BrandingModel(
+      primaryColor: json['primaryColor']?.toString() ?? '#3b82f6',
+      logo:         (logo      != null && logo.isNotEmpty)      ? logo      : null,
+      bannerUrl:    (bannerUrl != null && bannerUrl.isNotEmpty) ? bannerUrl : null,
+      customDomain: json['customDomain']?.toString(),
+      theme:        json['theme']?.toString() ?? 'light',
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'primaryColor': primaryColor,
@@ -53,13 +58,15 @@ class ContactInfoModel {
 
   ContactInfoModel({this.email, this.phone, this.linkedin, this.twitter});
 
-  factory ContactInfoModel.fromJson(Map<String, dynamic> json) =>
-      ContactInfoModel(
-        email: json['email'],
-        phone: json['phone'],
-        linkedin: json['linkedin'],
-        twitter: json['twitter'],
-      );
+  factory ContactInfoModel.fromJson(dynamic raw) {
+    final json = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
+    return ContactInfoModel(
+      email:    json['email']?.toString(),
+      phone:    json['phone']?.toString(),
+      linkedin: json['linkedin']?.toString(),
+      twitter:  json['twitter']?.toString(),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         if (email != null) 'email': email,
@@ -82,12 +89,15 @@ class AiConfigModel {
     this.autoBooking = true,
   });
 
-  factory AiConfigModel.fromJson(Map<String, dynamic> json) => AiConfigModel(
-        enabled: json['enabled'] ?? true,
-        personality: json['personality'] ?? 'professional and friendly',
-        greeting: json['greeting'] ?? 'Hello! How can I help you today?',
-        autoBooking: json['autoBooking'] ?? true,
-      );
+  factory AiConfigModel.fromJson(dynamic raw) {
+    final json = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
+    return AiConfigModel(
+      enabled:     json['enabled']     is bool ? json['enabled']     : true,
+      personality: json['personality']?.toString() ?? 'professional and friendly',
+      greeting:    json['greeting']?.toString()    ?? 'Hello! How can I help you today?',
+      autoBooking: json['autoBooking'] is bool ? json['autoBooking'] : true,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'enabled': enabled,
@@ -132,30 +142,40 @@ class ProfileModel {
         contactInfo = contactInfo ?? ContactInfoModel(),
         aiConfig = aiConfig ?? AiConfigModel();
 
-  factory ProfileModel.fromJson(Map<String, dynamic> json) => ProfileModel(
-        id: json['_id']?.toString() ?? json['id']?.toString(),
-        username: json['username'] ?? '',
-        displayName: json['displayName'] ?? '',
-        title: json['title'] ?? '',
-        company: json['company'] ?? '',
-        bio: json['bio'] ?? '',
-        avatar: json['avatar'],
-        coverImage: json['coverImage'],
-        branding: json['branding'] != null
-            ? BrandingModel.fromJson(json['branding'])
-            : BrandingModel(),
-        contactInfo: json['contactInfo'] != null
-            ? ContactInfoModel.fromJson(json['contactInfo'])
-            : ContactInfoModel(),
-        aiConfig: json['aiConfig'] != null
-            ? AiConfigModel.fromJson(json['aiConfig'])
-            : AiConfigModel(),
-        qrCode: json['qrCode'],
-        isPublic: json['isPublic'] ?? true,
-        createdAt: json['createdAt'] != null
-            ? DateTime.tryParse(json['createdAt'])
-            : null,
-      );
+  factory ProfileModel.fromJson(dynamic raw) {
+    // Guard: if the server returns a List instead of a Map, take the first item
+    final Map<String, dynamic> json;
+    if (raw is List) {
+      json = raw.isNotEmpty && raw.first is Map<String, dynamic>
+          ? raw.first as Map<String, dynamic>
+          : {};
+    } else if (raw is Map<String, dynamic>) {
+      json = raw;
+    } else {
+      json = {};
+    }
+
+    final avatar     = json['avatar']?.toString();
+    final coverImage = json['coverImage']?.toString();
+    return ProfileModel(
+      id:          json['_id']?.toString() ?? json['id']?.toString(),
+      username:    json['username']?.toString()    ?? '',
+      displayName: json['displayName']?.toString() ?? '',
+      title:       json['title']?.toString()       ?? '',
+      company:     json['company']?.toString()     ?? '',
+      bio:         json['bio']?.toString()         ?? '',
+      avatar:      (avatar     != null && avatar.isNotEmpty)     ? avatar     : null,
+      coverImage:  (coverImage != null && coverImage.isNotEmpty) ? coverImage : null,
+      branding:    BrandingModel.fromJson(json['branding']),
+      contactInfo: ContactInfoModel.fromJson(json['contactInfo']),
+      aiConfig:    AiConfigModel.fromJson(json['aiConfig']),
+      qrCode:      json['qrCode']?.toString(),
+      isPublic:    json['isPublic'] is bool ? json['isPublic'] : true,
+      createdAt:   json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
+          : null,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'username': username,
