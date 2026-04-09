@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -620,13 +622,23 @@ class _CardEditorScreenState extends State<_CardEditorScreen> {
   late final TextEditingController _bioCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _phoneCtrl;
-  late final TextEditingController _logoCtrl;
-  late final TextEditingController _bannerCtrl;
   late String _primaryColor;
   late String _theme;
+
+  // Existing remote URLs (from saved profile)
+  String? _avatarUrl;
+  String? _logoUrl;
+  String? _bannerUrl;
+
+  // Locally picked files (not yet uploaded)
+  File? _avatarFile;
+  File? _logoFile;
+  File? _bannerFile;
+
   bool _saving = false;
   String? _error;
 
+  final _picker = ImagePicker();
   final _themes = ['light', 'dark', 'gradient', 'glass', 'neon'];
   final _colors = ['#6366f1', '#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#14b8a6'];
 
@@ -641,15 +653,16 @@ class _CardEditorScreenState extends State<_CardEditorScreen> {
     _bioCtrl      = TextEditingController(text: p?.bio ?? '');
     _emailCtrl    = TextEditingController(text: p?.contactInfo.email ?? '');
     _phoneCtrl    = TextEditingController(text: p?.contactInfo.phone ?? '');
-    _logoCtrl     = TextEditingController(text: p?.branding.logo ?? '');
-    _bannerCtrl   = TextEditingController(text: p?.branding.bannerUrl ?? '');
     _primaryColor = p?.branding.primaryColor ?? '#6366f1';
     _theme        = p?.branding.theme ?? 'dark';
+    _avatarUrl    = p?.avatar;
+    _logoUrl      = p?.branding.logo;
+    _bannerUrl    = p?.branding.bannerUrl;
   }
 
   @override
   void dispose() {
-    for (final c in [_nameCtrl, _usernameCtrl, _titleCtrl, _companyCtrl, _bioCtrl, _emailCtrl, _phoneCtrl, _logoCtrl, _bannerCtrl]) {
+    for (final c in [_nameCtrl, _usernameCtrl, _titleCtrl, _companyCtrl, _bioCtrl, _emailCtrl, _phoneCtrl]) {
       c.dispose();
     }
     super.dispose();
@@ -657,6 +670,70 @@ class _CardEditorScreenState extends State<_CardEditorScreen> {
 
   Color _parseColor(String hex) {
     try { return Color(int.parse(hex.replaceFirst('#', '0xFF'))); } catch (_) { return DarkColors.primary; }
+  }
+
+  // ── Image picking ─────────────────────────────────────────────────────────
+
+  Future<void> _pickImage(String type) async {
+    final source = await _showSourceDialog();
+    if (source == null) return;
+
+    final picked = await _picker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: type == 'banner' ? 1200 : 800,
+      maxHeight: type == 'banner' ? 400  : 800,
+    );
+    if (picked == null) return;
+
+    final file = File(picked.path);
+    setState(() {
+      if (type == 'avatar') _avatarFile = file;
+      if (type == 'logo')   _logoFile   = file;
+      if (type == 'banner') _bannerFile = file;
+    });
+  }
+
+  Future<ImageSource?> _showSourceDialog() async {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: DarkColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 16),
+            width: 40, height: 4,
+            decoration: BoxDecoration(color: DarkColors.border, borderRadius: BorderRadius.circular(2)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined, color: DarkColors.primary),
+            title: const Text('Choose from Library', style: TextStyle(color: DarkColors.textPrimary)),
+            onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+          ),
+          ListTile(
+            leading: const Icon(Icons.camera_alt_outlined, color: DarkColors.primary),
+            title: const Text('Take a Photo', style: TextStyle(color: DarkColors.textPrimary)),
+            onTap: () => Navigator.pop(ctx, ImageSource.camera),
+          ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+  }
+
+  /// Uploads any newly-picked files and returns resolved URLs.
+  Future<({String? avatar, String? logo, String? banner})> _uploadPendingImages(
+      ProfileService service) async {
+    String? avatar = _avatarUrl;
+    String? logo   = _logoUrl;
+    String? banner = _bannerUrl;
+
+    if (_avatarFile != null) avatar = await service.uploadImage(_avatarFile!, 'avatar');
+    if (_logoFile   != null) logo   = await service.uploadImage(_logoFile!,   'logo');
+    if (_bannerFile != null) banner = await service.uploadImage(_bannerFile!,  'banner');
+
+    return (avatar: avatar, logo: logo, banner: banner);
   }
 
   Future<void> _save() async {
@@ -667,24 +744,30 @@ class _CardEditorScreenState extends State<_CardEditorScreen> {
     setState(() { _saving = true; _error = null; });
     try {
       final service = context.read<ProfileService>();
+
+      // Upload any newly-picked images first
+      final urls = await _uploadPendingImages(service);
+
       final profile = ProfileModel(
-        id: widget.profile?.id,
-        username: _usernameCtrl.text.trim(),
+        id:          widget.profile?.id,
+        username:    _usernameCtrl.text.trim(),
         displayName: _nameCtrl.text.trim(),
-        title: _titleCtrl.text.trim(),
-        company: _companyCtrl.text.trim(),
-        bio: _bioCtrl.text.trim(),
+        title:       _titleCtrl.text.trim(),
+        company:     _companyCtrl.text.trim(),
+        bio:         _bioCtrl.text.trim(),
+        avatar:      urls.avatar,
         branding: BrandingModel(
           primaryColor: _primaryColor,
-          theme: _theme,
-          logo: _logoCtrl.text.trim().isNotEmpty ? _logoCtrl.text.trim() : null,
-          bannerUrl: _bannerCtrl.text.trim().isNotEmpty ? _bannerCtrl.text.trim() : null,
+          theme:        _theme,
+          logo:         urls.logo,
+          bannerUrl:    urls.banner,
         ),
         contactInfo: ContactInfoModel(
           email: _emailCtrl.text.trim(),
           phone: _phoneCtrl.text.trim(),
         ),
       );
+
       if (widget.profile?.id != null) {
         await service.updateProfile(widget.profile!.id!, profile);
       } else {
@@ -747,12 +830,39 @@ class _CardEditorScreenState extends State<_CardEditorScreen> {
           ]),
           const SizedBox(height: 12),
 
-          _section('Branding & Banner', [
-            _field('Company Logo URL', _logoCtrl, hint: 'https://example.com/logo.png', onChanged: (_) => setState(() {})),
-            _field('Banner Image URL', _bannerCtrl, hint: 'https://example.com/banner.jpg', onChanged: (_) => setState(() {})),
-            const SizedBox(height: 4),
-            const Text('Banner appears at the top of your card and in email signatures.',
-              style: TextStyle(fontSize: 12, color: DarkColors.textMuted)),
+          _section('Profile Picture', [
+            _imagePicker(
+              label: 'Profile Photo',
+              icon: Icons.person_outline,
+              file: _avatarFile,
+              url: _avatarUrl,
+              shape: BoxShape.circle,
+              onTap: () => _pickImage('avatar'),
+            ),
+          ]),
+          const SizedBox(height: 12),
+
+          _section('Company Branding', [
+            _imagePicker(
+              label: 'Company Logo',
+              icon: Icons.business_outlined,
+              file: _logoFile,
+              url: _logoUrl,
+              shape: BoxShape.circle,
+              hint: 'Square image recommended',
+              onTap: () => _pickImage('logo'),
+            ),
+            const SizedBox(height: 12),
+            _imagePicker(
+              label: 'Card Banner',
+              icon: Icons.panorama_outlined,
+              file: _bannerFile,
+              url: _bannerUrl,
+              shape: BoxShape.rectangle,
+              hint: 'Appears at top of card & email signatures',
+              aspectRatio: 3.0,
+              onTap: () => _pickImage('banner'),
+            ),
           ]),
           const SizedBox(height: 12),
 
@@ -806,11 +916,38 @@ class _CardEditorScreenState extends State<_CardEditorScreen> {
   }
 
   Widget _buildCardPreview(Color brandColor) {
-    final hasBanner = _bannerCtrl.text.trim().isNotEmpty;
-    final hasLogo = _logoCtrl.text.trim().isNotEmpty;
-    final name = _nameCtrl.text.isEmpty ? 'Your Name' : _nameCtrl.text;
-    final title = _titleCtrl.text.isEmpty ? 'Job Title' : _titleCtrl.text;
-    final company = _companyCtrl.text.isEmpty ? 'Company' : _companyCtrl.text;
+    final hasBanner = _bannerFile != null || (_bannerUrl?.isNotEmpty ?? false);
+    final hasLogo   = _logoFile   != null || (_logoUrl?.isNotEmpty   ?? false);
+    final hasAvatar = _avatarFile != null || (_avatarUrl?.isNotEmpty ?? false);
+    final name    = _nameCtrl.text.isEmpty    ? 'Your Name' : _nameCtrl.text;
+    final title   = _titleCtrl.text.isEmpty   ? 'Job Title' : _titleCtrl.text;
+    final company = _companyCtrl.text.isEmpty ? 'Company'   : _companyCtrl.text;
+
+    Widget bannerWidget = _previewDefaultBanner(brandColor);
+    if (_bannerFile != null) {
+      bannerWidget = Image.file(_bannerFile!, fit: BoxFit.cover);
+    } else if (_bannerUrl?.isNotEmpty ?? false) {
+      bannerWidget = Image.network(_bannerUrl!, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _previewDefaultBanner(brandColor));
+    }
+
+    Widget avatarWidget;
+    if (_avatarFile != null) {
+      avatarWidget = ClipOval(child: Image.file(_avatarFile!, fit: BoxFit.cover));
+    } else if (hasAvatar) {
+      avatarWidget = ClipOval(child: Image.network(_avatarUrl!, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _avatarInitial(name, brandColor)));
+    } else {
+      avatarWidget = _avatarInitial(name, brandColor);
+    }
+
+    Widget logoWidget = Icon(Icons.business, color: brandColor, size: 20);
+    if (_logoFile != null) {
+      logoWidget = ClipOval(child: Image.file(_logoFile!, fit: BoxFit.cover));
+    } else if (hasLogo) {
+      logoWidget = ClipOval(child: Image.network(_logoUrl!, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Icon(Icons.business, color: brandColor, size: 20)));
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -820,48 +957,122 @@ class _CardEditorScreenState extends State<_CardEditorScreen> {
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Banner
         Stack(clipBehavior: Clip.none, children: [
-          SizedBox(
-            height: 80, width: double.infinity,
-            child: hasBanner
-                ? Image.network(_bannerCtrl.text.trim(), fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _previewDefaultBanner(brandColor))
-                : _previewDefaultBanner(brandColor),
-          ),
+          SizedBox(height: 80, width: double.infinity, child: bannerWidget),
           Positioned(
             bottom: -20, left: 14,
             child: Row(children: [
               Container(
                 width: 44, height: 44,
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: DarkColors.surface, width: 3), color: brandColor.withAlpha(40)),
-                child: hasLogo
-                    ? ClipOval(child: Image.network(_logoCtrl.text.trim(), fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(Icons.business, color: brandColor, size: 20)))
-                    : Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: TextStyle(color: brandColor, fontSize: 18, fontWeight: FontWeight.w800))),
+                decoration: BoxDecoration(shape: BoxShape.circle,
+                    border: Border.all(color: DarkColors.surface, width: 3),
+                    color: brandColor.withAlpha(40)),
+                child: hasLogo ? logoWidget : avatarWidget,
               ),
             ]),
           ),
         ]),
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 28, 14, 14),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: DarkColors.textPrimary)),
-                Text(title, style: const TextStyle(fontSize: 12, color: DarkColors.textSecondary)),
-                Text(company, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: brandColor)),
-              ])),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: brandColor.withAlpha(25), borderRadius: BorderRadius.circular(20), border: Border.all(color: brandColor.withAlpha(80))),
-                child: Text('Preview', style: TextStyle(fontSize: 10, color: brandColor, fontWeight: FontWeight.w600)),
-              ),
-            ]),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: DarkColors.textPrimary)),
+              Text(title, style: const TextStyle(fontSize: 12, color: DarkColors.textSecondary)),
+              Text(company, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: brandColor)),
+            ])),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: brandColor.withAlpha(25), borderRadius: BorderRadius.circular(20), border: Border.all(color: brandColor.withAlpha(80))),
+              child: Text('Preview', style: TextStyle(fontSize: 10, color: brandColor, fontWeight: FontWeight.w600)),
+            ),
           ]),
         ),
       ]),
+    );
+  }
+
+  Widget _avatarInitial(String name, Color color) => Center(
+    child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+        style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w800)),
+  );
+
+  /// Generic image picker tile — shows thumbnail or placeholder, tap to change.
+  Widget _imagePicker({
+    required String label,
+    required IconData icon,
+    required File? file,
+    required String? url,
+    required BoxShape shape,
+    required VoidCallback onTap,
+    String? hint,
+    double aspectRatio = 1.0,
+  }) {
+    final hasImage = file != null || (url?.isNotEmpty ?? false);
+    final brandColor = _parseColor(_primaryColor);
+    final isRect = shape == BoxShape.rectangle;
+
+    Widget imageWidget;
+    if (file != null) {
+      imageWidget = isRect
+          ? Image.file(file, fit: BoxFit.cover)
+          : ClipOval(child: Image.file(file, fit: BoxFit.cover));
+    } else if (url?.isNotEmpty ?? false) {
+      imageWidget = isRect
+          ? Image.network(url!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _emptyImagePlaceholder(icon, brandColor))
+          : ClipOval(child: Image.network(url!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _emptyImagePlaceholder(icon, brandColor)));
+    } else {
+      imageWidget = _emptyImagePlaceholder(icon, brandColor);
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: DarkColors.elevated,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: hasImage ? brandColor.withAlpha(80) : DarkColors.border),
+        ),
+        child: Row(children: [
+          // Thumbnail
+          Container(
+            width: isRect ? 90 : 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: shape,
+              color: DarkColors.surface,
+              border: Border.all(color: DarkColors.border),
+              borderRadius: isRect ? BorderRadius.circular(10) : null,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: AspectRatio(
+              aspectRatio: aspectRatio,
+              child: imageWidget,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: DarkColors.textPrimary)),
+            if (hint != null) ...[
+              const SizedBox(height: 3),
+              Text(hint, style: const TextStyle(fontSize: 12, color: DarkColors.textMuted)),
+            ],
+            const SizedBox(height: 6),
+            Text(
+              hasImage ? 'Tap to change' : 'Tap to upload',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: brandColor),
+            ),
+          ])),
+          Icon(Icons.upload_outlined, color: brandColor, size: 20),
+        ]),
+      ),
+    );
+  }
+
+  Widget _emptyImagePlaceholder(IconData icon, Color color) {
+    return Container(
+      color: color.withAlpha(20),
+      child: Center(child: Icon(icon, color: color.withAlpha(120), size: 22)),
     );
   }
 

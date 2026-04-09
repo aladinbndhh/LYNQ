@@ -36,6 +36,9 @@ class ApiConfig {
   static String get billingStatusUrl => '$baseUrl$apiVersion/billing/status';
   static String get stripePortalUrl => '$baseUrl$apiVersion/stripe/portal';
 
+  // Image upload
+  static String get uploadUrl => '$baseUrl$apiVersion/upload';
+
   // Public card URL
   static String publicCardUrl(String username) => '$baseUrl/$username';
 }

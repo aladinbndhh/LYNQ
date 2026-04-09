@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import '../config/api_config.dart';
 import '../models/profile_model.dart';
@@ -68,5 +69,33 @@ class ProfileService {
   Future<bool> isUsernameAvailable(String username) async {
     final response = await _dio.get(ApiConfig.checkUsernameUrl(username));
     return response.data['data']?['available'] == true;
+  }
+
+  /// Uploads [file] to the backend and returns the CDN URL.
+  /// [type] must be 'avatar', 'logo', or 'banner'.
+  Future<String> uploadImage(File file, String type) async {
+    final headers = await _auth.getAuthHeaders();
+    // Remove Content-Type so Dio sets multipart boundary automatically
+    headers.remove('Content-Type');
+
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(file.path,
+          filename: file.path.split('/').last),
+      'type': type,
+    });
+
+    final response = await _dio.post(
+      ApiConfig.uploadUrl,
+      data: formData,
+      options: Options(
+        headers: headers,
+        validateStatus: (_) => true,
+      ),
+    );
+
+    if (response.data['success'] == true) {
+      return response.data['data']['url'] as String;
+    }
+    throw Exception(response.data['error'] ?? 'Upload failed');
   }
 }
