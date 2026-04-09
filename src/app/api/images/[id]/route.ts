@@ -16,7 +16,9 @@ export async function GET(
       return new NextResponse('Image not found', { status: 404 });
     }
 
-    return new NextResponse(media.data as Buffer, {
+    // NextResponse body must be BodyInit — convert Buffer → Uint8Array
+    const bytes = new Uint8Array(media.data as unknown as ArrayBuffer);
+    return new NextResponse(bytes, {
       status: 200,
       headers: {
         'Content-Type':  media.contentType as string,
