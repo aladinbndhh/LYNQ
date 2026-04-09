@@ -134,7 +134,7 @@ class ProfileService {
   Future<String> uploadImage(File file, String type) async {
     try {
       final headers = await _auth.getAuthHeaders();
-      // Remove Content-Type so Dio sets multipart boundary automatically
+      // Remove Content-Type so Dio sets the multipart boundary automatically
       headers.remove('Content-Type');
 
       final formData = FormData.fromMap({
@@ -151,15 +151,25 @@ class ProfileService {
         options: Options(headers: headers),
       );
 
+      // Guard: if the server returned HTML or plain text instead of JSON,
+      // response.data will be a String — handle it gracefully.
+      if (response.data is! Map) {
+        throw Exception(
+            'Upload failed (status ${response.statusCode}): unexpected server response');
+      }
+
       if (response.data['success'] == true) {
         final data = response.data['data'];
         if (data is Map && data['url'] != null) {
           return data['url'].toString();
         }
+        throw Exception('Upload succeeded but no URL returned');
       }
+
       throw Exception(_err(response.data, 'Upload failed'));
     } on DioException catch (e) {
-      throw Exception(_err(e.response?.data, 'Upload failed — check connection'));
+      throw Exception(
+          _err(e.response?.data, 'Upload failed — check your connection'));
     }
   }
 }

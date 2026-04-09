@@ -1,23 +1,23 @@
-import { NextRequest } from 'next/server';
-import sharp from 'sharp';
+import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db/connection';
 import { Media } from '@/lib/db/models';
 import { requireAuth } from '@/lib/middleware/auth';
-import {
-  successResponse,
-  errorResponse,
-  unauthorizedResponse,
-} from '@/lib/utils/api';
+import { successResponse, unauthorizedResponse } from '@/lib/utils/api';
 
-const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_SIZE_MB  = 10;
+const ALLOWED_MIME = new Set([
+  'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif',
+]);
+const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
-// Resize specs per type
 const RESIZE: Record<string, { width: number; height: number; fit: 'cover' | 'contain' | 'inside' }> = {
   avatar: { width: 400,  height: 400,  fit: 'cover'   },
   logo:   { width: 400,  height: 400,  fit: 'contain' },
   banner: { width: 1200, height: 400,  fit: 'cover'   },
 };
+
+function jsonError(message: string, status = 400): NextResponse {
+  return NextResponse.json({ success: false, error: message }, { status });
+}
 
 // POST /api/upload
 // Body: multipart/form-data  { file: File, type: 'avatar' | 'logo' | 'banner' }
@@ -25,47 +25,70 @@ const RESIZE: Record<string, { width: number; height: number; fit: 'cover' | 'co
 export async function POST(request: NextRequest) {
   try {
     await connectDB();
-    const session = await requireAuth(request);
-    if (!session) return unauthorizedResponse();
 
-    const formData = await request.formData();
+    // Auth — supports NextAuth session and mobile JWT Bearer token
+    let session;
+    try {
+      session = await requireAuth(request);
+    } catch {
+      return unauthorizedResponse();
+    }
+
+    // Parse multipart body
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return jsonError('Could not parse upload — send multipart/form-data');
+    }
+
     const file = formData.get('file') as File | null;
-    const type = ((formData.get('type') as string) ?? 'avatar').toLowerCase();
+    const type = ((formData.get('type') as string) ?? 'avatar').toLowerCase().trim();
 
-    if (!file) return errorResponse('No file provided', 400);
-    if (!['avatar', 'logo', 'banner'].includes(type))
-      return errorResponse('type must be avatar, logo, or banner', 400);
-    if (!ALLOWED_MIME.includes(file.type))
-      return errorResponse('Only JPEG, PNG, WebP, and GIF images are allowed', 400);
-    if (file.size > MAX_SIZE_MB * 1024 * 1024)
-      return errorResponse(`File too large — maximum is ${MAX_SIZE_MB} MB`, 400);
+    if (!file || file.size === 0) return jsonError('No file provided');
+    if (!['avatar', 'logo', 'banner'].includes(type)) return jsonError('type must be avatar, logo, or banner');
+    if (file.size > MAX_BYTES) return jsonError(`File too large — max 10 MB`);
 
-    // Read file bytes
+    const mimeType = file.type || 'image/jpeg';
+    if (!ALLOWED_MIME.has(mimeType)) return jsonError('Only image files are allowed (JPEG, PNG, WebP, HEIC)');
+
+    // Read bytes
     const arrayBuffer = await file.arrayBuffer();
     const inputBuffer = Buffer.from(arrayBuffer);
 
-    // Resize & optimise with sharp (already bundled in Next.js)
-    const spec = RESIZE[type];
-    const processed = await sharp(inputBuffer)
-      .resize(spec.width, spec.height, { fit: spec.fit, withoutEnlargement: true })
-      .webp({ quality: 82 })           // normalise to WebP for consistent serving
-      .toBuffer();
+    // Resize with sharp — fall back to raw bytes if sharp unavailable
+    let finalBuffer = inputBuffer;
+    let finalMime   = mimeType;
+
+    try {
+      const sharp = (await import('sharp')).default;
+      const spec   = RESIZE[type];
+      finalBuffer = await sharp(inputBuffer)
+        .resize(spec.width, spec.height, { fit: spec.fit, withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toBuffer();
+      finalMime = 'image/webp';
+    } catch {
+      // sharp failed (missing native binary) — store the original bytes
+      console.warn('[upload] sharp unavailable, storing original bytes');
+    }
 
     // Persist to MongoDB
     const media = await Media.create({
-      tenantId:    session.user.tenantId,
-      uploadedBy:  session.user.id,
+      tenantId:    session.tenantId,
+      uploadedBy:  session.id,
       type,
-      data:        processed,
-      contentType: 'image/webp',
-      size:        processed.length,
+      data:        finalBuffer,
+      contentType: finalMime,
+      size:        finalBuffer.length,
     });
 
-    const url = `${process.env.NEXTAUTH_URL ?? ''}/api/images/${media._id.toString()}`;
+    const base = process.env.NEXTAUTH_URL?.replace(/\/$/, '') ?? 'https://lynq.cards';
+    const url  = `${base}/api/images/${media._id.toString()}`;
+
     return successResponse({ url });
   } catch (error: any) {
-    if (error.message === 'Unauthorized') return unauthorizedResponse();
     console.error('[upload]', error);
-    return errorResponse(error.message || 'Upload failed', 500);
+    return jsonError(error?.message ?? 'Upload failed', 500);
   }
 }
