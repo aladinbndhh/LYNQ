@@ -15,22 +15,40 @@ class AuthService {
   final AppLinks _appLinks = AppLinks();
 
   AuthService({Dio? dio, FlutterSecureStorage? storage})
-      : _dio = dio ?? Dio(),
+      : _dio = dio ??
+            Dio(BaseOptions(
+              // Accept all status codes — we read success/error from the JSON body
+              validateStatus: (_) => true,
+              connectTimeout: const Duration(seconds: 15),
+              receiveTimeout: const Duration(seconds: 15),
+            )),
         _storage = storage ?? const FlutterSecureStorage();
+
+  // ── Error helper ─────────────────────────────────────────────────────────────
+
+  /// Extracts a human-readable message from a Dio response or exception.
+  String _err(dynamic data, String fallback) {
+    if (data is Map) {
+      return (data['error'] ?? data['message'] ?? fallback).toString();
+    }
+    return fallback;
+  }
 
   // ── Email / Password ────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    final response = await _dio.post(
-      ApiConfig.loginUrl,
-      data: {'email': email, 'password': password},
-    );
-
-    if (response.data['success'] == true) {
-      await _persistSession(response.data['data']);
-      return response.data['data'];
-    } else {
-      throw Exception(response.data['error'] ?? 'Login failed');
+    try {
+      final response = await _dio.post(
+        ApiConfig.loginUrl,
+        data: {'email': email, 'password': password},
+      );
+      if (response.data['success'] == true) {
+        await _persistSession(response.data['data']);
+        return response.data['data'];
+      }
+      throw Exception(_err(response.data, 'Login failed'));
+    } on DioException catch (e) {
+      throw Exception(_err(e.response?.data, 'Could not reach server. Check your connection.'));
     }
   }
 
@@ -40,40 +58,49 @@ class AuthService {
     required String password,
     required String companyName,
   }) async {
-    final response = await _dio.post(
-      ApiConfig.signupUrl,
-      data: {
-        'name': name,
-        'email': email,
-        'password': password,
-        'companyName': companyName,
-      },
-    );
-
-    if (response.data['success'] != true) {
-      throw Exception(response.data['error'] ?? 'Signup failed');
+    try {
+      final response = await _dio.post(
+        ApiConfig.signupUrl,
+        data: {
+          'name': name,
+          'email': email,
+          'password': password,
+          'companyName': companyName,
+        },
+      );
+      if (response.data['success'] != true) {
+        throw Exception(_err(response.data, 'Signup failed'));
+      }
+    } on DioException catch (e) {
+      throw Exception(_err(e.response?.data, 'Could not reach server. Check your connection.'));
     }
   }
 
   Future<void> verifyOtp({required String email, required String code}) async {
-    final response = await _dio.post(
-      ApiConfig.verifyOtpUrl,
-      data: {'email': email, 'code': code},
-    );
-
-    if (response.data['success'] != true) {
-      throw Exception(response.data['error'] ?? 'Verification failed');
+    try {
+      final response = await _dio.post(
+        ApiConfig.verifyOtpUrl,
+        data: {'email': email, 'code': code},
+      );
+      if (response.data['success'] != true) {
+        throw Exception(_err(response.data, 'Verification failed'));
+      }
+    } on DioException catch (e) {
+      throw Exception(_err(e.response?.data, 'Could not reach server. Check your connection.'));
     }
   }
 
   Future<void> resendOtp({required String email}) async {
-    final response = await _dio.post(
-      ApiConfig.resendOtpUrl,
-      data: {'email': email},
-    );
-
-    if (response.data['success'] != true) {
-      throw Exception(response.data['error'] ?? 'Failed to resend code');
+    try {
+      final response = await _dio.post(
+        ApiConfig.resendOtpUrl,
+        data: {'email': email},
+      );
+      if (response.data['success'] != true) {
+        throw Exception(_err(response.data, 'Failed to resend code'));
+      }
+    } on DioException catch (e) {
+      throw Exception(_err(e.response?.data, 'Could not reach server. Check your connection.'));
     }
   }
 
@@ -84,10 +111,14 @@ class AuthService {
   /// redirects to  lynq://auth?token=...  which this method catches.
   Future<Map<String, dynamic>> loginWithGoogle() async {
     // 1. Ask the backend for the Google OAuth URL
-    final resp = await _dio.get(ApiConfig.googleStartUrl);
-    final oauthUrl = resp.data['url'] as String?;
-    if (oauthUrl == null) {
-      throw Exception(resp.data['error'] ?? 'Failed to start Google sign-in');
+    final String oauthUrl;
+    try {
+      final resp = await _dio.get(ApiConfig.googleStartUrl);
+      final url = resp.data['url'] as String?;
+      if (url == null) throw Exception(_err(resp.data, 'Failed to start Google sign-in'));
+      oauthUrl = url;
+    } on DioException catch (e) {
+      throw Exception(_err(e.response?.data, 'Could not reach server. Check your connection.'));
     }
 
     // 2. Bridge between the deep-link stream and this async call
