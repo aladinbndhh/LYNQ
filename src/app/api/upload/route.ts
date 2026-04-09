@@ -1,63 +1,68 @@
 import { NextRequest } from 'next/server';
-import { v2 as cloudinary } from 'cloudinary';
+import sharp from 'sharp';
+import connectDB from '@/lib/db/connection';
+import { Media } from '@/lib/db/models';
 import { requireAuth } from '@/lib/middleware/auth';
-import { successResponse, errorResponse, unauthorizedResponse } from '@/lib/utils/api';
+import {
+  successResponse,
+  errorResponse,
+  unauthorizedResponse,
+} from '@/lib/utils/api';
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_SIZE_MB  = 10;
 
-const ALLOWED_TYPES = ['avatar', 'logo', 'banner'] as const;
-const MAX_SIZE_MB   = 10;
+// Resize specs per type
+const RESIZE: Record<string, { width: number; height: number; fit: 'cover' | 'contain' | 'inside' }> = {
+  avatar: { width: 400,  height: 400,  fit: 'cover'   },
+  logo:   { width: 400,  height: 400,  fit: 'contain' },
+  banner: { width: 1200, height: 400,  fit: 'cover'   },
+};
 
 // POST /api/upload
 // Body: multipart/form-data  { file: File, type: 'avatar' | 'logo' | 'banner' }
-// Returns: { success: true, url: string }
+// Returns: { success: true, data: { url: string } }
 export async function POST(request: NextRequest) {
   try {
-    // Auth — supports both NextAuth session and mobile JWT Bearer token
+    await connectDB();
     const session = await requireAuth(request);
     if (!session) return unauthorizedResponse();
 
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
-    const type = (formData.get('type') as string | null) ?? 'avatar';
+    const type = ((formData.get('type') as string) ?? 'avatar').toLowerCase();
 
     if (!file) return errorResponse('No file provided', 400);
-    if (!ALLOWED_TYPES.includes(type as any)) return errorResponse('Invalid upload type', 400);
+    if (!['avatar', 'logo', 'banner'].includes(type))
+      return errorResponse('type must be avatar, logo, or banner', 400);
+    if (!ALLOWED_MIME.includes(file.type))
+      return errorResponse('Only JPEG, PNG, WebP, and GIF images are allowed', 400);
+    if (file.size > MAX_SIZE_MB * 1024 * 1024)
+      return errorResponse(`File too large — maximum is ${MAX_SIZE_MB} MB`, 400);
 
-    const sizeMB = file.size / (1024 * 1024);
-    if (sizeMB > MAX_SIZE_MB) return errorResponse(`File too large (max ${MAX_SIZE_MB} MB)`, 400);
-
-    // Convert File to Buffer
+    // Read file bytes
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const inputBuffer = Buffer.from(arrayBuffer);
 
-    // Upload to Cloudinary
-    const folder = `lynq/${session.user.tenantId ?? 'public'}/${type}`;
-    const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder,
-          resource_type: 'image',
-          allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
-          transformation: type === 'banner'
-            ? [{ width: 1200, height: 400, crop: 'fill', quality: 'auto' }]
-            : type === 'avatar'
-            ? [{ width: 400,  height: 400, crop: 'fill', quality: 'auto' }]
-            : [{ width: 400,  height: 400, crop: 'pad',  quality: 'auto', background: 'white' }],
-        },
-        (error, result) => {
-          if (error || !result) reject(error ?? new Error('Upload failed'));
-          else resolve(result as { secure_url: string });
-        }
-      );
-      stream.end(buffer);
+    // Resize & optimise with sharp (already bundled in Next.js)
+    const spec = RESIZE[type];
+    const processed = await sharp(inputBuffer)
+      .resize(spec.width, spec.height, { fit: spec.fit, withoutEnlargement: true })
+      .webp({ quality: 82 })           // normalise to WebP for consistent serving
+      .toBuffer();
+
+    // Persist to MongoDB
+    const media = await Media.create({
+      tenantId:    session.user.tenantId,
+      uploadedBy:  session.user.id,
+      type,
+      data:        processed,
+      contentType: 'image/webp',
+      size:        processed.length,
     });
 
-    return successResponse({ url: result.secure_url });
+    const url = `${process.env.NEXTAUTH_URL ?? ''}/api/images/${media._id.toString()}`;
+    return successResponse({ url });
   } catch (error: any) {
     if (error.message === 'Unauthorized') return unauthorizedResponse();
     console.error('[upload]', error);
