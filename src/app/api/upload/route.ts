@@ -52,21 +52,23 @@ export async function POST(request: NextRequest) {
     const mimeType = file.type || 'image/jpeg';
     if (!ALLOWED_MIME.has(mimeType)) return jsonError('Only image files are allowed (JPEG, PNG, WebP, HEIC)');
 
-    // Read bytes
+    // Read bytes — copy into a plain ArrayBuffer to satisfy TypeScript strict types
     const arrayBuffer = await file.arrayBuffer();
-    const inputBuffer = Buffer.from(arrayBuffer);
+    const inputBuffer = Buffer.from(new Uint8Array(arrayBuffer));
 
     // Resize with sharp — fall back to raw bytes if sharp unavailable
-    let finalBuffer = inputBuffer;
-    let finalMime   = mimeType;
+    let finalBuffer: Buffer = inputBuffer;
+    let finalMime           = mimeType;
 
     try {
       const sharp = (await import('sharp')).default;
       const spec   = RESIZE[type];
-      finalBuffer = await sharp(inputBuffer)
-        .resize(spec.width, spec.height, { fit: spec.fit, withoutEnlargement: true })
-        .webp({ quality: 82 })
-        .toBuffer();
+      finalBuffer = Buffer.from(
+        await sharp(inputBuffer as Buffer<ArrayBuffer>)
+          .resize(spec.width, spec.height, { fit: spec.fit, withoutEnlargement: true })
+          .webp({ quality: 82 })
+          .toBuffer()
+      );
       finalMime = 'image/webp';
     } catch {
       // sharp failed (missing native binary) — store the original bytes
