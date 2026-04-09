@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/lead_model.dart';
-import '../../services/lead_service.dart';
+import '../../services/lead_polling_service.dart';
 import '../../theme/app_theme.dart';
 
 class LeadsScreen extends StatefulWidget {
@@ -17,29 +17,35 @@ class LeadsScreen extends StatefulWidget {
 }
 
 class _LeadsScreenState extends State<LeadsScreen> {
-  List<LeadModel> _leads = [];
-  bool _loading = true;
-  String? _error;
   String _filterStatus = 'all';
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadLeads();
+    // Clear badge and trigger first fetch
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final svc = context.read<LeadPollingService>();
+      svc.markSeen();
+      svc.refresh(status: _filterStatus);
+    });
   }
 
-  Future<void> _loadLeads() async {
-    setState(() { _loading = true; _error = null; });
+  Future<void> _applyFilter(String status) async {
+    setState(() => _filterStatus = status);
     try {
-      final leads = await context.read<LeadService>().listLeads(
-        status: _filterStatus == 'all' ? null : _filterStatus,
-      );
-      if (mounted) setState(() { _leads = leads; _loading = false; });
+      await context.read<LeadPollingService>().refresh(status: status);
     } catch (e) {
-      if (mounted) setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
-        _loading = false;
-      });
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _error = null);
+    try {
+      await context.read<LeadPollingService>().refresh(status: _filterStatus);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
@@ -65,6 +71,9 @@ class _LeadsScreenState extends State<LeadsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final polling = context.watch<LeadPollingService>();
+    final leads = polling.leads;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Leads'),
@@ -83,7 +92,7 @@ class _LeadsScreenState extends State<LeadsScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: GestureDetector(
-                      onTap: () { setState(() => _filterStatus = s); _loadLeads(); },
+                      onTap: () => _applyFilter(s),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
@@ -108,23 +117,35 @@ class _LeadsScreenState extends State<LeadsScreen> {
           ),
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: DarkColors.primary, strokeWidth: 2))
-          : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: DarkColors.error)))
-              : _leads.isEmpty
-                  ? _buildEmptyState()
-                  : RefreshIndicator(
-                      color: DarkColors.primary,
-                      backgroundColor: DarkColors.surface,
-                      onRefresh: _loadLeads,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _leads.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (ctx, i) => _buildLeadCard(_leads[i]),
-                      ),
-                    ),
+      body: _error != null
+          ? Center(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text(_error!, style: const TextStyle(color: DarkColors.error)),
+                const SizedBox(height: 12),
+                TextButton(onPressed: _refresh, child: const Text('Retry')),
+              ]),
+            )
+          : leads.isEmpty
+              ? RefreshIndicator(
+                  color: DarkColors.primary,
+                  backgroundColor: DarkColors.surface,
+                  onRefresh: _refresh,
+                  child: ListView(
+                    children: [SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                      _buildEmptyState()],
+                  ),
+                )
+              : RefreshIndicator(
+                  color: DarkColors.primary,
+                  backgroundColor: DarkColors.surface,
+                  onRefresh: _refresh,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: leads.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (ctx, i) => _buildLeadCard(leads[i]),
+                  ),
+                ),
     );
   }
 

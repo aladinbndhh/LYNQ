@@ -42,6 +42,8 @@ dependencies:
   app_links: ^6.3.4
   # Temp file path for vCard export
   path_provider: ^2.1.4
+  # Local notifications (new lead alerts)
+  flutter_local_notifications: ^18.0.1
 
 dev_dependencies:
   flutter_test:
