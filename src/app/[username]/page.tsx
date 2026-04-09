@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation';
-import Image from 'next/image';
 import connectDB from '@/lib/db/connection';
 import { ProfileService } from '@/lib/services/profile.service';
 import { ModernChatWidget } from '@/components/ui/modern-chat-widget';
@@ -57,8 +56,10 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   const borderColor = isDark ? '#334155' : '#e2e8f0';
   const chipBg      = isDark ? '#334155' : '#f1f5f9';
 
-  const coverGradient = profile.coverImage
-    ? `url(${profile.coverImage}) center/cover no-repeat`
+  // Prefer branding.bannerUrl (set by mobile/web editor), fall back to legacy coverImage
+  const bannerImage = (profile as any).branding?.bannerUrl || profile.coverImage || null;
+  const coverGradient = bannerImage
+    ? `url(${bannerImage}) center/cover no-repeat`
     : `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}bb 100%)`;
 
   return (
@@ -83,7 +84,8 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           {/* Avatar + logo badge */}
           <div style={{ position: 'relative', flexShrink: 0 }}>
             {profile.avatar ? (
-              <Image
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
                 src={profile.avatar}
                 alt={profile.displayName}
                 width={104}
@@ -93,6 +95,8 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                   border: `4px solid ${cardBg}`,
                   objectFit: 'cover',
                   display: 'block',
+                  width: '104px',
+                  height: '104px',
                 }}
               />
             ) : (
@@ -108,7 +112,8 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
               </div>
             )}
             {profile.branding?.logo && (
-              <Image
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
                 src={profile.branding.logo}
                 alt="Company logo"
                 width={32}
@@ -119,6 +124,8 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                   border: `2px solid ${cardBg}`,
                   background: '#fff',
                   objectFit: 'contain',
+                  width: '32px',
+                  height: '32px',
                 }}
               />
             )}
@@ -127,12 +134,13 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           {/* QR code */}
           {profile.qrCode && (
             <div style={{ textAlign: 'center', paddingBottom: '4px' }}>
-              <Image
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src={profile.qrCode}
                 alt="QR Code"
                 width={68}
                 height={68}
-                style={{ borderRadius: '8px', border: `1px solid rgba(255,255,255,0.4)` }}
+                style={{ borderRadius: '8px', border: `1px solid rgba(255,255,255,0.4)`, width: '68px', height: '68px' }}
               />
               <p style={{ fontSize: '9px', color: '#fff', marginTop: '3px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>Scan to save</p>
             </div>
