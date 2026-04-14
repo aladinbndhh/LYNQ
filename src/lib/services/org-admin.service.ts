@@ -190,8 +190,8 @@ export class OrgAdminService {
         ) as any;
 
         if (odoo) {
-          // Derive a username from the Odoo username or from the invitee name
-          const baseUsername = (odoo.username || name.trim())
+          // Generate username from employee name
+          const baseUsername = name.trim()
             .toLowerCase()
             .replace(/[^a-z0-9]/g, '-')
             .replace(/-+/g, '-')
@@ -214,19 +214,17 @@ export class OrgAdminService {
             displayName: odoo.name || name.trim(),
             title: odoo.title || '',
             company: odoo.company || '',
-            bio: odoo.bio || '',
+            bio: '',
             avatar: odoo.avatar || '',
-            coverImage: odoo.coverImage || '',
+            coverImage: '',
             branding: {
-              primaryColor: odoo.primaryColor || '#3b82f6',
+              primaryColor: '#3b82f6',
               logo: odoo.logo || '',
-              bannerUrl: odoo.coverImage || '',
+              bannerUrl: '',
             },
             contactInfo: {
               email: odoo.email || email,
               phone: odoo.phone || '',
-              linkedin: odoo.linkedin || '',
-              twitter: odoo.twitter || '',
             },
             qrCode,
           });

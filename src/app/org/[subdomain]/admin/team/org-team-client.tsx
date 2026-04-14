@@ -21,13 +21,13 @@ type OdooEmployee = {
   id: number;
   name: string;
   email: string;
-  username: string;
   title?: string;
+  department?: string;
   company?: string;
+  companyId?: number;
   avatar?: string;
   logo?: string;
-  coverImage?: string;
-  primaryColor: string;
+  phone?: string;
 };
 
 export function OrgTeamClient() {
@@ -220,51 +220,48 @@ export function OrgTeamClient() {
                     key={emp.id}
                     className="rounded-xl border border-border bg-card overflow-hidden"
                   >
-                    {/* Mini banner */}
-                    <div
-                      className="h-10"
-                      style={{
-                        background: emp.coverImage
-                          ? `url(${emp.coverImage}) center/cover`
-                          : (emp.primaryColor || '#3b82f6') + '33',
-                      }}
-                    />
-                    <div className="px-4 pb-4 -mt-5 flex gap-3 items-end">
+                    <div className="p-4 flex gap-3 items-center">
                       {/* Avatar */}
-                      <div
-                        className="w-10 h-10 rounded-lg border-2 border-background bg-muted overflow-hidden flex-shrink-0"
-                        style={{ borderColor: emp.primaryColor || '#3b82f6' }}
-                      >
-                        {emp.avatar ? (
-                          <img src={emp.avatar} alt={emp.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div
-                            className="w-full h-full flex items-center justify-center text-sm font-bold text-white"
-                            style={{ backgroundColor: emp.primaryColor || '#3b82f6' }}
-                          >
-                            {emp.name?.[0]?.toUpperCase()}
-                          </div>
-                        )}
+                      <div className="w-12 h-12 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+                        <img
+                          src={emp.avatar}
+                          alt={emp.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const el = e.currentTarget;
+                            el.style.display = 'none';
+                            el.parentElement!.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-bold text-base">${emp.name?.[0]?.toUpperCase() ?? '?'}</div>`;
+                          }}
+                        />
                       </div>
-                      {/* Company logo */}
-                      {emp.logo && (
-                        <div className="ml-auto mb-0.5">
-                          <img src={emp.logo} alt="Logo" className="h-6 object-contain" />
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm truncate">{emp.name}</p>
+                          {/* Company logo */}
+                          {emp.logo && (
+                            <img src={emp.logo} alt="" className="h-4 object-contain flex-shrink-0" />
+                          )}
                         </div>
-                      )}
+                        {emp.title && (
+                          <p className="text-xs text-muted-foreground truncate">{emp.title}</p>
+                        )}
+                        {emp.department && (
+                          <p className="text-xs text-muted-foreground truncate">{emp.department}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {emp.email || 'No email'}
+                        </p>
+                      </div>
                     </div>
 
                     <div className="px-4 pb-4">
-                      <p className="font-medium text-sm">{emp.name}</p>
-                      {emp.title && <p className="text-xs text-muted-foreground">{emp.title}</p>}
-                      {emp.company && <p className="text-xs text-muted-foreground">{emp.company}</p>}
-                      <p className="text-xs text-muted-foreground mt-1 truncate">{emp.email || 'No email'}</p>
-
                       <button
                         type="button"
                         disabled={alreadyAdded || isSending || !emp.email}
                         onClick={() => sendOdooInvite(emp)}
-                        className={`mt-3 w-full rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        className={`w-full rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                           alreadyAdded
                             ? 'bg-muted text-muted-foreground cursor-default'
                             : 'bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50'

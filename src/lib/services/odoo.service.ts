@@ -8,13 +8,13 @@ export interface OdooEmployee {
   id: number;
   name: string;
   email: string;
-  username: string;
   title?: string;
+  department?: string;
   company?: string;
+  companyId?: number;
   avatar?: string;
-  coverImage?: string;
   logo?: string;
-  primaryColor: string;
+  phone?: string;
 }
 
 export class OdooService {
@@ -56,7 +56,7 @@ export class OdooService {
   }
 
   /**
-   * Get employees (lynq.profile records) from the tenant's connected Odoo instance
+   * Get employees directly from hr.employee in Odoo — no lynq.profile record needed
    */
   static async getOdooEmployees(tenantId: Types.ObjectId): Promise<OdooEmployee[]> {
     const tenant = await Tenant.findById(tenantId).lean();
@@ -72,60 +72,54 @@ export class OdooService {
       password: '',
     });
 
-    const profiles = await client.searchRead(
-      'lynq.profile',
-      [],
+    const employees = await client.searchRead(
+      'hr.employee',
+      [['active', '=', true]],
       [
         'id',
-        'display_name',
+        'name',
         'work_email',
-        'username',
-        'title',
-        'company',
-        'avatar',
-        'partner_id',
-        'cover_image',
-        'primary_color',
-        'company_logo',
+        'job_title',
+        'job_id',
+        'department_id',
+        'company_id',
+        'work_phone',
+        'mobile_phone',
       ]
     );
 
-    return profiles.map((p: any) => {
-      const partnerId = p.partner_id
-        ? (Array.isArray(p.partner_id) ? p.partner_id[0] : p.partner_id)
+    return employees.map((e: any) => {
+      const companyId = e.company_id
+        ? (Array.isArray(e.company_id) ? e.company_id[0] : e.company_id)
         : null;
-
-      const avatar = partnerId
-        ? `${baseUrl}/lynq/image/partner/${partnerId}/avatar`
-        : p.avatar
-          ? `${baseUrl}/web/image/lynq.profile/${p.id}/avatar`
-          : undefined;
+      const companyName = e.company_id
+        ? (Array.isArray(e.company_id) ? e.company_id[1] : undefined)
+        : undefined;
+      const deptName = e.department_id
+        ? (Array.isArray(e.department_id) ? e.department_id[1] : undefined)
+        : undefined;
 
       return {
-        id: p.id,
-        name: p.display_name || '',
-        email: p.work_email || '',
-        username: p.username || '',
-        title: p.title || undefined,
-        company: p.company || undefined,
-        avatar,
-        coverImage: p.cover_image
-          ? `${baseUrl}/web/image/lynq.profile/${p.id}/cover_image`
-          : undefined,
-        logo: p.company
-          ? `${baseUrl}/lynq/image/profile/${p.id}/company_logo`
-          : undefined,
-        primaryColor: p.primary_color || '#3b82f6',
+        id: e.id,
+        name: e.name || '',
+        email: e.work_email || '',
+        title: e.job_title || (e.job_id ? (Array.isArray(e.job_id) ? e.job_id[1] : undefined) : undefined),
+        department: deptName,
+        company: companyName,
+        companyId: companyId || undefined,
+        avatar: `${baseUrl}/lynq/image/employee/${e.id}/avatar`,
+        logo: companyId ? `${baseUrl}/lynq/image/company/${companyId}/logo` : undefined,
+        phone: e.work_phone || e.mobile_phone || undefined,
       } as OdooEmployee;
     });
   }
 
   /**
-   * Get a single Odoo profile record for pre-filling an accepted invitation
+   * Get a single hr.employee record for pre-filling an accepted invitation
    */
   static async getOdooProfileForInvite(
     tenantId: Types.ObjectId,
-    odooProfileId: number
+    odooEmployeeId: number
   ): Promise<OdooEmployee | null> {
     const tenant = await Tenant.findById(tenantId).lean();
     if (!tenant?.odooConfig?.url) return null;
@@ -138,63 +132,47 @@ export class OdooService {
       password: '',
     });
 
-    const profiles = await client.searchRead(
-      'lynq.profile',
-      [['id', '=', odooProfileId]],
+    const employees = await client.searchRead(
+      'hr.employee',
+      [['id', '=', odooEmployeeId]],
       [
         'id',
-        'display_name',
+        'name',
         'work_email',
-        'username',
-        'title',
-        'company',
-        'bio',
-        'avatar',
-        'partner_id',
-        'cover_image',
-        'primary_color',
-        'company_logo',
-        'phone',
-        'linkedin',
-        'twitter',
+        'job_title',
+        'job_id',
+        'department_id',
+        'company_id',
+        'work_phone',
+        'mobile_phone',
       ],
       1
     );
 
-    if (profiles.length === 0) return null;
+    if (employees.length === 0) return null;
 
-    const p = profiles[0];
-    const partnerId = p.partner_id
-      ? (Array.isArray(p.partner_id) ? p.partner_id[0] : p.partner_id)
+    const e = employees[0];
+    const companyId = e.company_id
+      ? (Array.isArray(e.company_id) ? e.company_id[0] : e.company_id)
       : null;
-
-    const avatar = partnerId
-      ? `${baseUrl}/lynq/image/partner/${partnerId}/avatar`
-      : p.avatar
-        ? `${baseUrl}/web/image/lynq.profile/${p.id}/avatar`
-        : undefined;
+    const companyName = e.company_id
+      ? (Array.isArray(e.company_id) ? e.company_id[1] : undefined)
+      : undefined;
 
     return {
-      id: p.id,
-      name: p.display_name || '',
-      email: p.work_email || '',
-      username: p.username || '',
-      title: p.title || undefined,
-      company: p.company || undefined,
-      avatar,
-      coverImage: p.cover_image
-        ? `${baseUrl}/web/image/lynq.profile/${p.id}/cover_image`
+      id: e.id,
+      name: e.name || '',
+      email: e.work_email || '',
+      title: e.job_title || (e.job_id ? (Array.isArray(e.job_id) ? e.job_id[1] : undefined) : undefined),
+      department: e.department_id
+        ? (Array.isArray(e.department_id) ? e.department_id[1] : undefined)
         : undefined,
-      logo: p.company
-        ? `${baseUrl}/lynq/image/profile/${p.id}/company_logo`
-        : undefined,
-      primaryColor: p.primary_color || '#3b82f6',
-      // Extra fields for profile creation
-      ...(p.bio ? { bio: p.bio } : {}),
-      ...(p.phone ? { phone: p.phone } : {}),
-      ...(p.linkedin ? { linkedin: p.linkedin } : {}),
-      ...(p.twitter ? { twitter: p.twitter } : {}),
-    } as OdooEmployee & { bio?: string; phone?: string; linkedin?: string; twitter?: string };
+      company: companyName,
+      companyId: companyId || undefined,
+      avatar: `${baseUrl}/lynq/image/employee/${e.id}/avatar`,
+      logo: companyId ? `${baseUrl}/lynq/image/company/${companyId}/logo` : undefined,
+      phone: e.work_phone || e.mobile_phone || undefined,
+    } as OdooEmployee;
   }
 
   /**
