@@ -56,7 +56,8 @@ export class OdooService {
   }
 
   /**
-   * Get employees directly from hr.employee in Odoo — no lynq.profile record needed
+   * Get employees directly from hr.employee via the dedicated /lynq/api/employees endpoint.
+   * No lynq.profile record needed in Odoo.
    */
   static async getOdooEmployees(tenantId: Types.ObjectId): Promise<OdooEmployee[]> {
     const tenant = await Tenant.findById(tenantId).lean();
@@ -65,57 +66,38 @@ export class OdooService {
     }
 
     const baseUrl = tenant.odooConfig.url.replace(/\/$/, '');
-    const client = new OdooClient({
-      url: baseUrl,
-      database: tenant.odooConfig.database || '',
-      username: '',
-      password: '',
+
+    const res = await fetch(`${baseUrl}/lynq/api/employees`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
     });
 
-    const employees = await client.searchRead(
-      'hr.employee',
-      [['active', '=', true]],
-      [
-        'id',
-        'name',
-        'work_email',
-        'job_title',
-        'job_id',
-        'department_id',
-        'company_id',
-        'work_phone',
-        'mobile_phone',
-      ]
-    );
+    if (!res.ok) {
+      throw new Error(`Failed to fetch employees from Odoo: HTTP ${res.status}`);
+    }
 
-    return employees.map((e: any) => {
-      const companyId = e.company_id
-        ? (Array.isArray(e.company_id) ? e.company_id[0] : e.company_id)
-        : null;
-      const companyName = e.company_id
-        ? (Array.isArray(e.company_id) ? e.company_id[1] : undefined)
-        : undefined;
-      const deptName = e.department_id
-        ? (Array.isArray(e.department_id) ? e.department_id[1] : undefined)
-        : undefined;
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
 
-      return {
-        id: e.id,
-        name: e.name || '',
-        email: e.work_email || '',
-        title: e.job_title || (e.job_id ? (Array.isArray(e.job_id) ? e.job_id[1] : undefined) : undefined),
-        department: deptName,
-        company: companyName,
-        companyId: companyId || undefined,
-        avatar: `${baseUrl}/lynq/image/employee/${e.id}/avatar`,
-        logo: companyId ? `${baseUrl}/lynq/image/company/${companyId}/logo` : undefined,
-        phone: e.work_phone || e.mobile_phone || undefined,
-      } as OdooEmployee;
-    });
+    const employees: any[] = Array.isArray(data.result) ? data.result : [];
+
+    return employees.map((e) => ({
+      id: e.id,
+      name: e.name || '',
+      email: e.work_email || '',
+      title: e.job_title || undefined,
+      department: e.department || undefined,
+      company: e.company_name || undefined,
+      companyId: e.company_id || undefined,
+      avatar: `${baseUrl}/lynq/image/employee/${e.id}/avatar`,
+      logo: e.company_id ? `${baseUrl}/lynq/image/company/${e.company_id}/logo` : undefined,
+      phone: e.phone || undefined,
+    } as OdooEmployee));
   }
 
   /**
-   * Get a single hr.employee record for pre-filling an accepted invitation
+   * Get a single hr.employee record for pre-filling an accepted invitation.
+   * Calls /lynq/api/employee/{id} — reads hr.employee directly.
    */
   static async getOdooProfileForInvite(
     tenantId: Types.ObjectId,
@@ -125,53 +107,29 @@ export class OdooService {
     if (!tenant?.odooConfig?.url) return null;
 
     const baseUrl = tenant.odooConfig.url.replace(/\/$/, '');
-    const client = new OdooClient({
-      url: baseUrl,
-      database: tenant.odooConfig.database || '',
-      username: '',
-      password: '',
+
+    const res = await fetch(`${baseUrl}/lynq/api/employee/${odooEmployeeId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
     });
 
-    const employees = await client.searchRead(
-      'hr.employee',
-      [['id', '=', odooEmployeeId]],
-      [
-        'id',
-        'name',
-        'work_email',
-        'job_title',
-        'job_id',
-        'department_id',
-        'company_id',
-        'work_phone',
-        'mobile_phone',
-      ],
-      1
-    );
+    if (!res.ok) return null;
 
-    if (employees.length === 0) return null;
+    const data = await res.json();
+    if (data.error || !data.result) return null;
 
-    const e = employees[0];
-    const companyId = e.company_id
-      ? (Array.isArray(e.company_id) ? e.company_id[0] : e.company_id)
-      : null;
-    const companyName = e.company_id
-      ? (Array.isArray(e.company_id) ? e.company_id[1] : undefined)
-      : undefined;
-
+    const e = data.result;
     return {
       id: e.id,
       name: e.name || '',
       email: e.work_email || '',
-      title: e.job_title || (e.job_id ? (Array.isArray(e.job_id) ? e.job_id[1] : undefined) : undefined),
-      department: e.department_id
-        ? (Array.isArray(e.department_id) ? e.department_id[1] : undefined)
-        : undefined,
-      company: companyName,
-      companyId: companyId || undefined,
+      title: e.job_title || undefined,
+      department: e.department || undefined,
+      company: e.company_name || undefined,
+      companyId: e.company_id || undefined,
       avatar: `${baseUrl}/lynq/image/employee/${e.id}/avatar`,
-      logo: companyId ? `${baseUrl}/lynq/image/company/${companyId}/logo` : undefined,
-      phone: e.work_phone || e.mobile_phone || undefined,
+      logo: e.company_id ? `${baseUrl}/lynq/image/company/${e.company_id}/logo` : undefined,
+      phone: e.phone || undefined,
     } as OdooEmployee;
   }
 
