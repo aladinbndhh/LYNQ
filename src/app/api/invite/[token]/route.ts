@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server';
 import connectDB from '@/lib/db/connection';
 import { OrgAdminService } from '@/lib/services/org-admin.service';
 import { OdooService } from '@/lib/services/odoo.service';
-import { Tenant } from '@/lib/db/models';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/utils/api';
 import { Types } from 'mongoose';
 
@@ -23,14 +22,14 @@ export async function GET(
     let odooProfile: {
       name: string;
       title?: string;
+      department?: string;
       company?: string;
       avatar?: string;
       logo?: string;
-      coverImage?: string;
-      primaryColor: string;
+      phone?: string;
     } | null = null;
 
-    // Fetch Odoo profile data for pre-filling the accept form
+    // Fetch Odoo employee data for pre-filling the accept form
     if (inv.odooProfileId) {
       try {
         const tenantId = new Types.ObjectId(
@@ -41,11 +40,11 @@ export async function GET(
           odooProfile = {
             name: op.name,
             title: op.title,
+            department: op.department,
             company: op.company,
             avatar: op.avatar,
             logo: op.logo,
-            coverImage: op.coverImage,
-            primaryColor: op.primaryColor,
+            phone: op.phone,
           };
         }
       } catch {

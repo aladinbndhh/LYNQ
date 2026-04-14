@@ -7,11 +7,11 @@ import Link from 'next/link';
 type OdooProfile = {
   name: string;
   title?: string;
+  department?: string;
   company?: string;
   avatar?: string;
   logo?: string;
-  coverImage?: string;
-  primaryColor: string;
+  phone?: string;
 };
 
 export default function AcceptInvitePage() {
@@ -90,8 +90,6 @@ export default function AcceptInvitePage() {
     );
   }
 
-  const accentColor = odooProfile?.primaryColor || '#3b82f6';
-
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 py-12">
       <img src="/logo.png" alt="" className="w-16 h-16 mb-6 object-contain" />
@@ -100,54 +98,43 @@ export default function AcceptInvitePage() {
         Create your password for <span className="text-foreground font-medium">{email}</span>
       </p>
 
-      {/* Odoo profile preview card */}
+      {/* Odoo employee preview card */}
       {odooProfile && (
-        <div className="w-full max-w-sm mb-8 rounded-xl border border-border overflow-hidden shadow-sm">
-          {/* Banner / cover */}
-          {odooProfile.coverImage ? (
-            <div
-              className="h-20 bg-cover bg-center"
-              style={{ backgroundImage: `url(${odooProfile.coverImage})` }}
-            />
-          ) : (
-            <div className="h-20" style={{ backgroundColor: accentColor + '33' }} />
-          )}
-
-          <div className="px-5 pb-5 -mt-8 flex gap-4 items-end">
+        <div className="w-full max-w-sm mb-8 rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+          <div className="p-4 flex gap-4 items-center">
             {/* Avatar */}
-            <div
-              className="w-16 h-16 rounded-xl border-2 border-background bg-muted overflow-hidden flex-shrink-0"
-              style={{ borderColor: accentColor }}
-            >
+            <div className="w-14 h-14 rounded-xl bg-muted overflow-hidden flex-shrink-0">
               {odooProfile.avatar ? (
                 <img src={odooProfile.avatar} alt={odooProfile.name} className="w-full h-full object-cover" />
               ) : (
-                <div
-                  className="w-full h-full flex items-center justify-center text-2xl font-bold text-white"
-                  style={{ backgroundColor: accentColor }}
-                >
+                <div className="w-full h-full flex items-center justify-center text-2xl font-bold bg-primary/10 text-primary">
                   {odooProfile.name?.[0]?.toUpperCase()}
                 </div>
               )}
             </div>
 
-            {/* Company logo */}
-            {odooProfile.logo && (
-              <div className="ml-auto mb-1">
-                <img src={odooProfile.logo} alt="Company logo" className="h-8 object-contain" />
+            {/* Info + logo */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-sm truncate">{odooProfile.name}</p>
+                {odooProfile.logo && (
+                  <img src={odooProfile.logo} alt="Company logo" className="h-5 object-contain flex-shrink-0" />
+                )}
               </div>
-            )}
+              {odooProfile.title && (
+                <p className="text-xs text-muted-foreground truncate">{odooProfile.title}</p>
+              )}
+              {odooProfile.department && (
+                <p className="text-xs text-muted-foreground truncate">{odooProfile.department}</p>
+              )}
+              {odooProfile.company && (
+                <p className="text-xs text-muted-foreground truncate">{odooProfile.company}</p>
+              )}
+            </div>
           </div>
 
-          <div className="px-5 pb-5">
-            <p className="font-semibold text-base">{odooProfile.name}</p>
-            {odooProfile.title && (
-              <p className="text-sm text-muted-foreground">{odooProfile.title}</p>
-            )}
-            {odooProfile.company && (
-              <p className="text-xs text-muted-foreground mt-0.5">{odooProfile.company}</p>
-            )}
-            <p className="text-xs text-muted-foreground mt-3 italic">
+          <div className="px-4 pb-4">
+            <p className="text-xs text-muted-foreground italic">
               Your profile will be pre-filled from your Odoo records. You can update it after signing in.
             </p>
           </div>
