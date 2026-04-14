@@ -1,9 +1,11 @@
 import { Types } from 'mongoose';
 import crypto from 'crypto';
 import connectDB from '@/lib/db/connection';
-import { Tenant, User, Invitation } from '@/lib/db/models';
+import { Tenant, User, Invitation, Profile } from '@/lib/db/models';
 import { hashPassword } from '@/lib/utils/auth';
 import { isValidSubdomain, normalizeSubdomain } from '@/lib/subdomain';
+import { OdooService } from '@/lib/services/odoo.service';
+import { ProfileService } from '@/lib/services/profile.service';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -104,7 +106,8 @@ export class OrgAdminService {
     tenantId: Types.ObjectId,
     email: string,
     role: 'admin' | 'user',
-    invitedBy: Types.ObjectId
+    invitedBy: Types.ObjectId,
+    odooProfileId?: number
   ) {
     await connectDB();
     const normalized = email.toLowerCase().trim();
@@ -133,6 +136,7 @@ export class OrgAdminService {
       role,
       invitedBy,
       expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+      ...(odooProfileId ? { odooProfileId } : {}),
     });
 
     return inv.toObject();
@@ -168,7 +172,7 @@ export class OrgAdminService {
     }
 
     const passwordHash = await hashPassword(password);
-    await User.create({
+    const user = await User.create({
       tenantId: inv.tenantId,
       email,
       passwordHash,
@@ -176,6 +180,61 @@ export class OrgAdminService {
       role: inv.role,
       emailVerified: true,
     });
+
+    // Pre-fill profile from Odoo if this invitation was sent from the Odoo employee view
+    if (inv.odooProfileId) {
+      try {
+        const odoo = await OdooService.getOdooProfileForInvite(
+          inv.tenantId,
+          inv.odooProfileId
+        ) as any;
+
+        if (odoo) {
+          // Derive a username from the Odoo username or from the invitee name
+          const baseUsername = (odoo.username || name.trim())
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '')
+            || 'user';
+
+          // Ensure username uniqueness
+          let finalUsername = baseUsername;
+          let suffix = 1;
+          while (await Profile.findOne({ username: finalUsername })) {
+            finalUsername = `${baseUsername}-${suffix++}`;
+          }
+
+          const qrCode = await ProfileService.generateQRCode(finalUsername);
+
+          await Profile.create({
+            tenantId: inv.tenantId,
+            userId: user._id,
+            username: finalUsername,
+            displayName: odoo.name || name.trim(),
+            title: odoo.title || '',
+            company: odoo.company || '',
+            bio: odoo.bio || '',
+            avatar: odoo.avatar || '',
+            coverImage: odoo.coverImage || '',
+            branding: {
+              primaryColor: odoo.primaryColor || '#3b82f6',
+              logo: odoo.logo || '',
+              bannerUrl: odoo.coverImage || '',
+            },
+            contactInfo: {
+              email: odoo.email || email,
+              phone: odoo.phone || '',
+              linkedin: odoo.linkedin || '',
+              twitter: odoo.twitter || '',
+            },
+            qrCode,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to pre-fill profile from Odoo — profile will be blank:', err);
+      }
+    }
 
     inv.usedAt = new Date();
     await inv.save();

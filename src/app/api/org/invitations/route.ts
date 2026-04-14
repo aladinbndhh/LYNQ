@@ -38,7 +38,11 @@ export async function POST(request: NextRequest) {
     await connectDB();
     const session = await requireAdmin(request);
     const ctx = createTenantContext(session);
-    const body = await parseRequestBody<{ email: string; role?: 'admin' | 'user' }>(request);
+    const body = await parseRequestBody<{
+      email: string;
+      role?: 'admin' | 'user';
+      odooProfileId?: number;
+    }>(request);
     if (!body?.email) return errorResponse('email is required', 400);
 
     const tenant = await OrgAdminService.getTenant(ctx.tenantId);
@@ -46,7 +50,8 @@ export async function POST(request: NextRequest) {
       ctx.tenantId,
       body.email,
       body.role === 'admin' ? 'admin' : 'user',
-      new Types.ObjectId(session.id)
+      new Types.ObjectId(session.id),
+      body.odooProfileId ? Number(body.odooProfileId) : undefined
     );
 
     const inviteUrl = `${APP_URL}/invite/${inv.token}`;

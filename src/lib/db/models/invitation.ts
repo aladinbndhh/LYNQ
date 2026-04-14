@@ -8,6 +8,7 @@ export interface IInvitation extends Document {
   invitedBy: mongoose.Types.ObjectId;
   expiresAt: Date;
   usedAt?: Date;
+  odooProfileId?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +22,7 @@ const InvitationSchema = new Schema<IInvitation>(
     invitedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     expiresAt: { type: Date, required: true },
     usedAt: { type: Date },
+    odooProfileId: { type: Number },
   },
   { timestamps: true }
 );

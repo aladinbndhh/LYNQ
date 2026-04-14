@@ -4,6 +4,19 @@ import { OdooClient } from '@/lib/integrations/odoo-client';
 import { TenantContext } from '@/lib/middleware/tenant';
 import { ILead } from '@/types';
 
+export interface OdooEmployee {
+  id: number;
+  name: string;
+  email: string;
+  username: string;
+  title?: string;
+  company?: string;
+  avatar?: string;
+  coverImage?: string;
+  logo?: string;
+  primaryColor: string;
+}
+
 export class OdooService {
   /**
    * Connect to Odoo
@@ -40,6 +53,148 @@ export class OdooService {
       console.error('Odoo connection error:', error);
       throw new Error('Failed to connect to Odoo');
     }
+  }
+
+  /**
+   * Get employees (lynq.profile records) from the tenant's connected Odoo instance
+   */
+  static async getOdooEmployees(tenantId: Types.ObjectId): Promise<OdooEmployee[]> {
+    const tenant = await Tenant.findById(tenantId).lean();
+    if (!tenant?.odooConfig?.url) {
+      throw new Error('Odoo not connected');
+    }
+
+    const baseUrl = tenant.odooConfig.url.replace(/\/$/, '');
+    const client = new OdooClient({
+      url: baseUrl,
+      database: tenant.odooConfig.database || '',
+      username: '',
+      password: '',
+    });
+
+    const profiles = await client.searchRead(
+      'lynq.profile',
+      [],
+      [
+        'id',
+        'display_name',
+        'email',
+        'username',
+        'title',
+        'company',
+        'avatar',
+        'partner_id',
+        'cover_image',
+        'primary_color',
+        'company_logo',
+      ]
+    );
+
+    return profiles.map((p: any) => {
+      const partnerId = p.partner_id
+        ? (Array.isArray(p.partner_id) ? p.partner_id[0] : p.partner_id)
+        : null;
+
+      const avatar = partnerId
+        ? `${baseUrl}/lynq/image/partner/${partnerId}/avatar`
+        : p.avatar
+          ? `${baseUrl}/web/image/lynq.profile/${p.id}/avatar`
+          : undefined;
+
+      return {
+        id: p.id,
+        name: p.display_name || '',
+        email: p.email || '',
+        username: p.username || '',
+        title: p.title || undefined,
+        company: p.company || undefined,
+        avatar,
+        coverImage: p.cover_image
+          ? `${baseUrl}/web/image/lynq.profile/${p.id}/cover_image`
+          : undefined,
+        logo: p.company
+          ? `${baseUrl}/lynq/image/profile/${p.id}/company_logo`
+          : undefined,
+        primaryColor: p.primary_color || '#3b82f6',
+      } as OdooEmployee;
+    });
+  }
+
+  /**
+   * Get a single Odoo profile record for pre-filling an accepted invitation
+   */
+  static async getOdooProfileForInvite(
+    tenantId: Types.ObjectId,
+    odooProfileId: number
+  ): Promise<OdooEmployee | null> {
+    const tenant = await Tenant.findById(tenantId).lean();
+    if (!tenant?.odooConfig?.url) return null;
+
+    const baseUrl = tenant.odooConfig.url.replace(/\/$/, '');
+    const client = new OdooClient({
+      url: baseUrl,
+      database: tenant.odooConfig.database || '',
+      username: '',
+      password: '',
+    });
+
+    const profiles = await client.searchRead(
+      'lynq.profile',
+      [['id', '=', odooProfileId]],
+      [
+        'id',
+        'display_name',
+        'email',
+        'username',
+        'title',
+        'company',
+        'bio',
+        'avatar',
+        'partner_id',
+        'cover_image',
+        'primary_color',
+        'company_logo',
+        'phone',
+        'linkedin',
+        'twitter',
+      ],
+      1
+    );
+
+    if (profiles.length === 0) return null;
+
+    const p = profiles[0];
+    const partnerId = p.partner_id
+      ? (Array.isArray(p.partner_id) ? p.partner_id[0] : p.partner_id)
+      : null;
+
+    const avatar = partnerId
+      ? `${baseUrl}/lynq/image/partner/${partnerId}/avatar`
+      : p.avatar
+        ? `${baseUrl}/web/image/lynq.profile/${p.id}/avatar`
+        : undefined;
+
+    return {
+      id: p.id,
+      name: p.display_name || '',
+      email: p.email || '',
+      username: p.username || '',
+      title: p.title || undefined,
+      company: p.company || undefined,
+      avatar,
+      coverImage: p.cover_image
+        ? `${baseUrl}/web/image/lynq.profile/${p.id}/cover_image`
+        : undefined,
+      logo: p.company
+        ? `${baseUrl}/lynq/image/profile/${p.id}/company_logo`
+        : undefined,
+      primaryColor: p.primary_color || '#3b82f6',
+      // Extra fields for profile creation
+      ...(p.bio ? { bio: p.bio } : {}),
+      ...(p.phone ? { phone: p.phone } : {}),
+      ...(p.linkedin ? { linkedin: p.linkedin } : {}),
+      ...(p.twitter ? { twitter: p.twitter } : {}),
+    } as OdooEmployee & { bio?: string; phone?: string; linkedin?: string; twitter?: string };
   }
 
   /**
