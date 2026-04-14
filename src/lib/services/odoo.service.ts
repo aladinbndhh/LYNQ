@@ -78,7 +78,7 @@ export class OdooService {
       [
         'id',
         'display_name',
-        'email',
+        'work_email',
         'username',
         'title',
         'company',
@@ -104,7 +104,7 @@ export class OdooService {
       return {
         id: p.id,
         name: p.display_name || '',
-        email: p.email || '',
+        email: p.work_email || '',
         username: p.username || '',
         title: p.title || undefined,
         company: p.company || undefined,
@@ -144,7 +144,7 @@ export class OdooService {
       [
         'id',
         'display_name',
-        'email',
+        'work_email',
         'username',
         'title',
         'company',
@@ -177,7 +177,7 @@ export class OdooService {
     return {
       id: p.id,
       name: p.display_name || '',
-      email: p.email || '',
+      email: p.work_email || '',
       username: p.username || '',
       title: p.title || undefined,
       company: p.company || undefined,
