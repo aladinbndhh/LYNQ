@@ -10,6 +10,8 @@ interface EmailSignatureProps {
   company: string;
   email?: string;
   phone?: string;
+  /** Optional street / office line (shown in muted gray like Popl-style signatures) */
+  location?: string;
   website?: string;
   linkedin?: string;
   twitter?: string;
@@ -29,11 +31,47 @@ function buildHtml(p: EmailSignatureProps): string {
   const cardUrl = p.website || appUrl;
   const tpl = p.template || 'classic';
 
-  const avatarHtml = p.showAvatar !== false && p.avatar
-    ? `<img src="${p.avatar}" alt="${p.name}" width="80" height="80" style="width:80px;height:80px;border-radius:50%;object-fit:cover;display:block;">`
-    : p.showAvatar !== false
-      ? `<div style="width:80px;height:80px;border-radius:50%;background-color:${color};display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;font-weight:700;font-family:Arial,sans-serif;">${p.name.charAt(0).toUpperCase()}</div>`
+  const initials = p.name
+    .split(/\s+/)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+
+  const avatarInner =
+    p.showAvatar !== false && p.avatar
+      ? `<img src="${p.avatar}" alt="${p.name}" width="120" height="120" style="width:120px;height:120px;border-radius:50%;object-fit:cover;display:block;">`
+      : p.showAvatar !== false
+        ? `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr><td width="120" height="120" align="center" valign="middle" style="width:120px;height:120px;border-radius:50%;background-color:${color};color:#ffffff;font-size:40px;font-weight:700;font-family:Arial,sans-serif;line-height:120px;">${initials}</td></tr></table>`
+        : '';
+
+  const showBadge = Boolean(p.companyLogo || p.company);
+  const badgeInner = p.companyLogo
+    ? `<img src="${p.companyLogo}" alt="${p.company}" width="40" height="40" style="width:40px;height:40px;border-radius:50%;object-fit:contain;display:block;">`
+    : p.company
+      ? `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr><td width="40" height="40" align="center" valign="middle" style="width:40px;height:40px;border-radius:50%;background-color:#f3f4f6;color:#6b7280;font-size:14px;font-weight:600;font-family:Arial,sans-serif;line-height:40px;">${p.company.charAt(0).toUpperCase()}</td></tr></table>`
       : '';
+
+  const avatarWithBadge =
+    !avatarInner
+      ? ''
+      : showBadge && badgeInner
+        ? `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;">
+  <tr><td style="padding:0;line-height:0;font-size:0;">${avatarInner}</td></tr>
+  <tr><td align="right" valign="top" style="padding:0;line-height:0;font-size:0;">
+    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-top:-28px;margin-right:2px;mso-table-lspace:0pt;mso-table-rspace:0pt;">
+      <tr><td style="padding:3px;background:#ffffff;border-radius:50%;">${badgeInner}</td></tr>
+    </table>
+  </td></tr>
+</table>`
+        : avatarInner;
+
+  const avatarHtml =
+    p.showAvatar !== false && p.avatar
+      ? `<img src="${p.avatar}" alt="${p.name}" width="80" height="80" style="width:80px;height:80px;border-radius:50%;object-fit:cover;display:block;">`
+      : p.showAvatar !== false
+        ? `<div style="width:80px;height:80px;border-radius:50%;background-color:${color};display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;font-weight:700;font-family:Arial,sans-serif;">${initials}</div>`
+        : '';
 
   const logoHtml = p.companyLogo
     ? `<img src="${p.companyLogo}" alt="${p.company}" width="24" height="24" style="width:24px;height:24px;border-radius:50%;object-fit:contain;border:2px solid #fff;">`
@@ -137,33 +175,44 @@ function buildHtml(p: EmailSignatureProps): string {
 </table>`;
   }
 
-  // Classic (default)
-  return `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif;width:460px;border:1.3px solid #f2f2f2;box-sizing:border-box;">
+  // Classic (default) — Popl-style card: soft shadow, rounded frame, badge on avatar, centered QR column
+  const socialRow =
+    p.showSocials !== false && socialIcons.length
+      ? `<tr><td style="padding-top:10px;padding-bottom:4px;"><table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tbody><tr>${socialIcons.join('')}</tr></tbody></table></td></tr>`
+      : '';
+
+  return `<table cellpadding="0" cellspacing="0" border="0" id="copy-signature" style="width:460px;max-width:460px;border-collapse:separate;border-spacing:0;background:#ffffff;border:1px solid #f2f2f2;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,0.07);font-family:Arial,Helvetica,sans-serif;box-sizing:border-box;">
   <tbody>
     <tr>
-      <td style="width:220px;padding:20px 0 0 20px;vertical-align:top;">
-        <table cellpadding="0" cellspacing="0" border="0" style="width:100%;">
-          <tr>
-            <td style="padding-bottom:12px;">
-              ${avatarHtml ? `<div style="position:relative;display:inline-block;">${avatarHtml}${logoHtml ? `<div style="position:absolute;bottom:-2px;right:-2px;">${logoHtml}</div>` : ''}</div>` : ''}
-            </td>
-          </tr>
-          <tr><td style="font-size:17px;font-weight:700;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;">${p.name}</td></tr>
-          <tr><td style="font-size:12px;color:#4f4f4f;padding-top:2px;">${p.title || ''}</td></tr>
-          <tr><td style="font-size:12px;color:#4f4f4f;">${p.company || ''}</td></tr>
-          ${p.phone ? `<tr><td style="font-size:12px;color:#828282;padding-top:4px;">${p.phone}</td></tr>` : ''}
-          <tr><td style="padding-top:10px;padding-bottom:20px;">${socialIcons.join('')}</td></tr>
+      <td style="width:210px;padding:20px 8px 20px 20px;vertical-align:top;">
+        <table cellpadding="0" cellspacing="0" border="0" id="leftSideTable" style="max-width:210px;width:100%;border-collapse:collapse;">
+          <tbody>
+            <tr><td style="padding:0 0 4px 0;line-height:0;">${avatarWithBadge}</td></tr>
+            <tr><td style="font-size:18px;font-weight:600;color:#111111;padding:8px 0 0 0;margin:0;line-height:1.2;font-family:Arial,sans-serif;">
+              <span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;">${p.name}</span>
+            </td></tr>
+            <tr><td style="font-size:12px;font-weight:400;color:#4f4f4f;padding:0;line-height:15px;font-family:Arial,sans-serif;"><span style="font-size:12px;color:#4f4f4f;line-height:15px;">${p.title || ''}</span></td></tr>
+            <tr><td style="font-size:12px;font-weight:400;color:#4f4f4f;padding:0;line-height:15px;font-family:Arial,sans-serif;"><span style="font-size:12px;color:#4f4f4f;line-height:15px;">${p.company || ''}</span></td></tr>
+            ${p.location ? `<tr><td style="font-size:12px;font-weight:400;color:#828282;padding:10px 0 0 0;line-height:15px;font-family:Arial,sans-serif;"><span style="display:block;padding-top:2px;">${p.location}</span></td></tr>` : ''}
+            ${p.phone ? `<tr><td style="font-size:12px;font-weight:400;color:#828282;padding:${p.location ? '4px' : '10px'} 0 0 0;line-height:15px;height:16px;font-family:Arial,sans-serif;"><span>${p.phone}</span></td></tr>` : ''}
+            ${socialRow}
+            <tr><td style="padding-bottom:0;font-size:0;line-height:0;">&nbsp;</td></tr>
+          </tbody>
         </table>
       </td>
-      <td style="width:1px;background:#f2f2f2;"></td>
-      <td align="center" style="padding:20px 20px 0 24px;vertical-align:top;">
-        ${p.showQr !== false && p.qrCode ? `<div style="text-align:center;">
-          <div style="font-size:11px;color:#828282;margin-bottom:6px;">Connect with me</div>
-          <img src="${p.qrCode}" width="140" height="140" style="display:block;border-radius:8px;border:1px solid #e2e8f0;">
-          <a href="${cardUrl}" style="font-size:11px;color:${color};text-decoration:none;display:block;margin-top:8px;margin-bottom:20px;">My Digital Business Card</a>
-        </div>` : `<div style="padding:20px;text-align:center;">
-          <a href="${cardUrl}" style="font-size:13px;color:${color};text-decoration:none;font-weight:600;">View My Card →</a>
-        </div>`}
+      <td style="padding:0;width:8px;font-size:0;line-height:0;">&nbsp;</td>
+      <td align="center" style="padding:20px 20px 20px 32px;vertical-align:top;">
+        ${p.showQr !== false && p.qrCode
+          ? `<table cellpadding="0" cellspacing="0" border="0" style="width:180px;border-collapse:collapse;margin:0 auto;">
+          <tbody>
+            <tr><td style="text-align:center;padding:5px 0 8px 0;"><span style="font-size:12px;font-weight:500;color:#828282;display:block;font-family:Arial,sans-serif;">Connect with me</span></td></tr>
+            <tr><td style="text-align:center;padding:0;line-height:0;"><img width="172" height="172" src="${p.qrCode}" alt="QR Code" style="width:172px;height:auto;max-height:190px;display:block;margin:0 auto;border:0;"></td></tr>
+            <tr><td style="text-align:center;padding:8px 0 0 0;"><a href="${cardUrl}" target="_blank" rel="noreferrer" style="font-size:12px;text-align:center;text-decoration:underline;font-weight:400;color:${color};display:block;font-family:Arial,sans-serif;">My Digital Business Card</a></td></tr>
+          </tbody>
+        </table>`
+          : `<table cellpadding="0" cellspacing="0" border="0" style="width:180px;margin:0 auto;"><tbody><tr><td style="text-align:center;padding:24px 8px;">
+          <a href="${cardUrl}" target="_blank" rel="noreferrer" style="font-size:12px;color:${color};text-decoration:underline;font-weight:600;font-family:Arial,sans-serif;">View My Digital Business Card</a>
+        </td></tr></tbody></table>`}
       </td>
     </tr>
   </tbody>
@@ -342,7 +391,7 @@ export function EmailSignatureTemplate(props: EmailSignatureProps) {
             <iframe
               ref={iframeRef}
               className="w-full"
-              style={{ height: '260px', border: 'none' }}
+              style={{ height: '300px', border: 'none' }}
               title="Signature Preview"
               sandbox="allow-same-origin"
             />
